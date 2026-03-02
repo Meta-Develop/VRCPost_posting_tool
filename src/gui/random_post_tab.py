@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from loguru import logger
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -64,6 +64,8 @@ class RandomPostTab(QWidget):
 
     # スケジュール登録時に発火
     post_scheduled = Signal(object)
+    # 画像残数が少なくなったとき (dir_path, remaining, total)
+    images_running_low = Signal(str, int, int)
 
     def __init__(
         self,
@@ -77,6 +79,12 @@ class RandomPostTab(QWidget):
         self._history = ImageHistory()
         self._current_dir: Path | None = None
         self._preview_path: Path | None = None
+        self._auto_posting = False
+        self._low_image_threshold = 5
+
+        # 自動投稿タイマー
+        self._auto_timer = QTimer(self)
+        self._auto_timer.timeout.connect(self._auto_post_tick)
 
         self._setup_ui()
         self._connect_bridge_signals()
@@ -161,6 +169,46 @@ class RandomPostTab(QWidget):
         count_row.addWidget(self._count_spin)
         count_row.addStretch()
         layout.addLayout(count_row)
+
+        # --- 自動投稿 ---
+        auto_group = QGroupBox("自動ランダム投稿")
+        auto_layout = QVBoxLayout(auto_group)
+
+        auto_desc = QLabel(
+            "ONにすると、指定間隔で未使用画像を自動的にランダム投稿します。"
+        )
+        auto_desc.setStyleSheet("color: #9ca3af; font-size: 12px;")
+        auto_desc.setWordWrap(True)
+        auto_layout.addWidget(auto_desc)
+
+        auto_row = QHBoxLayout()
+        self._auto_check = QCheckBox("自動投稿を有効にする")
+        self._auto_check.toggled.connect(self._toggle_auto_post)
+        auto_row.addWidget(self._auto_check)
+
+        auto_row.addWidget(QLabel("間隔:"))
+        self._interval_spin = QSpinBox()
+        self._interval_spin.setRange(1, 1440)
+        self._interval_spin.setValue(60)
+        self._interval_spin.setSuffix(" 分")
+        auto_row.addWidget(self._interval_spin)
+
+        auto_row.addWidget(QLabel("画像残:"))
+        self._threshold_spin = QSpinBox()
+        self._threshold_spin.setRange(1, 100)
+        self._threshold_spin.setValue(5)
+        self._threshold_spin.setSuffix(" 枚で通知")
+        self._threshold_spin.valueChanged.connect(self._on_threshold_changed)
+        auto_row.addWidget(self._threshold_spin)
+
+        auto_row.addStretch()
+        auto_layout.addLayout(auto_row)
+
+        self._auto_status_label = QLabel("")
+        self._auto_status_label.setStyleSheet("color: #9ca3af; font-size: 12px;")
+        auto_layout.addWidget(self._auto_status_label)
+
+        layout.addWidget(auto_group)
 
         # --- 予約設定 ---
         schedule_group = QGroupBox("スケジュール (任意)")
@@ -339,6 +387,66 @@ class RandomPostTab(QWidget):
 
         self._update_stats()
         self._pick_random()
+        self._check_low_images()
+
+    # ── 自動投稿 ─────────────────────────────────────
+
+    def _toggle_auto_post(self, checked: bool) -> None:
+        """自動投稿の有効/無効を切り替え."""
+        if checked:
+            if not self._current_dir:
+                QMessageBox.warning(self, "エラー", "先にフォルダを選択してください")
+                self._auto_check.setChecked(False)
+                return
+            interval_ms = self._interval_spin.value() * 60 * 1000
+            self._auto_timer.start(interval_ms)
+            self._auto_posting = True
+            self._interval_spin.setEnabled(False)
+            self._auto_status_label.setText(
+                f"自動投稿 ON ─ {self._interval_spin.value()}分間隔"
+            )
+            self._auto_status_label.setStyleSheet("color: #22c55e; font-size: 12px;")
+            logger.info(f"自動投稿開始: {self._interval_spin.value()}分間隔")
+        else:
+            self._auto_timer.stop()
+            self._auto_posting = False
+            self._interval_spin.setEnabled(True)
+            self._auto_status_label.setText("自動投稿 OFF")
+            self._auto_status_label.setStyleSheet("color: #9ca3af; font-size: 12px;")
+            logger.info("自動投稿停止")
+
+    def _auto_post_tick(self) -> None:
+        """自動投稿タイマーのティック."""
+        if not self._current_dir or not self._bridge:
+            return
+
+        count = self._count_spin.value()
+        images = self._history.pick_unused(self._current_dir, count)
+        if not images:
+            self._auto_check.setChecked(False)
+            logger.warning("自動投稿: 未使用画像がなくなったため停止")
+            return
+
+        text = self._text_edit.toPlainText().strip()
+        self._bridge.create_post(text=text, image_paths=images)
+        logger.info(f"自動投稿: {[p.name for p in images]}")
+
+        self._update_stats()
+        self._pick_random()
+        self._check_low_images()
+
+    def _on_threshold_changed(self, value: int) -> None:
+        self._low_image_threshold = value
+
+    def _check_low_images(self) -> None:
+        """未使用画像が閾値以下なら警告シグナルを発火."""
+        if not self._current_dir:
+            return
+        total, _used, remaining = self._history.get_stats(self._current_dir)
+        if total > 0 and remaining <= self._low_image_threshold:
+            self.images_running_low.emit(
+                str(self._current_dir), remaining, total,
+            )
 
     # ── 履歴リセット ─────────────────────────────────
 
