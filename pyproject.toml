@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "vrcpost-poster"
 version = "0.1.0"
@@ -29,6 +33,9 @@ dev = [
 
 [project.scripts]
 vrcpost-poster = "src.gui.main_window:main"
+
+[tool.setuptools.packages.find]
+include = ["src*"]
 
 [tool.ruff]
 line-length = 100

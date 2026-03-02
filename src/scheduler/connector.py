@@ -47,7 +47,7 @@ class SchedulerConnector(QObject):
     # コールバック
     # ------------------------------------------------------------------
 
-    async def _execute_job(self, job: ScheduledJob) -> None:
+    def _execute_job(self, job: ScheduledJob) -> None:
         """SchedulerEngine から呼び出されるジョブ実行コールバック.
 
         ジョブ種別に応じて BrowserBridge の適切なメソッドを呼び出す。
@@ -71,9 +71,9 @@ class SchedulerConnector(QObject):
 
         try:
             if job.job_type == JobType.POST:
-                await self._execute_post(job)
+                self._execute_post(job)
             elif job.job_type == JobType.STORY:
-                await self._execute_story(job)
+                self._execute_story(job)
             else:
                 raise ValueError(f"未対応のジョブ種別: {job.job_type}")
 
@@ -90,7 +90,7 @@ class SchedulerConnector(QObject):
     # ジョブ種別ごとの実行
     # ------------------------------------------------------------------
 
-    async def _execute_post(self, job: ScheduledJob) -> None:
+    def _execute_post(self, job: ScheduledJob) -> None:
         """投稿ジョブを実行する.
 
         Args:
@@ -102,7 +102,7 @@ class SchedulerConnector(QObject):
             image_paths=image_paths,
         )
 
-    async def _execute_story(self, job: ScheduledJob) -> None:
+    def _execute_story(self, job: ScheduledJob) -> None:
         """ストーリージョブを実行する.
 
         Args:

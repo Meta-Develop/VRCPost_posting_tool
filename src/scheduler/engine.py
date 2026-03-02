@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Callable, Optional
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 from loguru import logger
@@ -27,7 +27,7 @@ class SchedulerEngine:
 
     def __init__(self, settings: AppSettings) -> None:
         self.settings = settings
-        self._scheduler = AsyncIOScheduler(timezone=settings.scheduler.timezone)
+        self._scheduler = BackgroundScheduler(timezone=settings.scheduler.timezone)
         self._jobs: dict[str, ScheduledJob] = {}
         self._job_callback: Optional[Callable] = None
         self._jobs_file = Path(settings.scheduler.jobs_file)
@@ -141,7 +141,7 @@ class SchedulerEngine:
         """
         return self._jobs.get(job_id)
 
-    async def _execute_job(self, job_id: str) -> None:
+    def _execute_job(self, job_id: str) -> None:
         """ジョブを実行.
 
         Args:
@@ -157,7 +157,7 @@ class SchedulerEngine:
 
         try:
             if self._job_callback:
-                await self._job_callback(job)
+                self._job_callback(job)
             job.status = JobStatus.COMPLETED
             job.completed_at = datetime.now()
             logger.info(f"ジョブ実行完了: {job_id}")
