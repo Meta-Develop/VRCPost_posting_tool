@@ -46,7 +46,6 @@ class StoryManager:
             await page.goto(f"{base_url}/home", wait_until="networkidle")
 
             # ストーリー追加ボタンを探す
-            # VRCPostのストーリーUIに合わせてセレクタを調整
             story_add_button = page.locator(
                 "button:has-text('ストーリー'), "
                 "button:has-text('Story'), "
@@ -56,23 +55,31 @@ class StoryManager:
             await story_add_button.click()
             await page.wait_for_timeout(500)
 
-            # 画像アップロード
-            file_input = page.locator("input[type='file']").first
+            # モーダル/ダイアログ内に限定してセレクタを探す
+            modal = page.locator(
+                "#story-modal, .modal:visible, "
+                "[role='dialog']:visible"
+            ).first
+
+            # 画像アップロード（モーダル内のfile input）
+            file_input = modal.locator("input[type='file']").first
             await file_input.set_input_files(str(image_path))
             await page.wait_for_timeout(1500)
             logger.debug(f"ストーリー画像アップロード: {image_path.name}")
 
             # テキスト入力（あれば）
             if text:
-                text_input = page.locator(
-                    "textarea, [contenteditable='true'], input[type='text']"
+                text_input = modal.locator(
+                    "input[type='text'], textarea"
                 ).first
                 await text_input.fill(text)
 
-            # 投稿ボタン
-            submit_button = page.locator(
-                "button:has-text('投稿'), button:has-text('Post'), "
-                "button:has-text('Share'), button[type='submit']"
+            # 投稿ボタン（モーダル内）
+            submit_button = modal.locator(
+                "button[type='submit'], "
+                "button:has-text('投稿'), "
+                "button:has-text('Post'), "
+                "button:has-text('Share')"
             ).first
             await submit_button.click()
 
