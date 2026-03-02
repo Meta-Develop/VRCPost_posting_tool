@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from loguru import logger
 from PySide6.QtCore import Qt, Signal
@@ -27,6 +28,10 @@ from PySide6.QtWidgets import (
 )
 
 from src.config.settings import AppSettings
+from src.scheduler.jobs import JobType, ScheduledJob
+
+if TYPE_CHECKING:
+    from src.browser.bridge import BrowserBridge
 
 
 class ImagePreview(QWidget):
@@ -67,13 +72,23 @@ class ImagePreview(QWidget):
 class PostTab(QWidget):
     """投稿作成タブ."""
 
-    def __init__(self, settings: AppSettings, parent=None) -> None:
+    # 予約ジョブを通知するシグナル
+    post_scheduled = Signal(object)
+
+    def __init__(
+        self,
+        settings: AppSettings,
+        bridge: BrowserBridge | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self.settings = settings
+        self._bridge = bridge
         self._image_paths: list[Path] = []
 
         self.setAcceptDrops(True)
         self._setup_ui()
+        self._connect_bridge_signals()
 
     def _setup_ui(self) -> None:
         """UIを構築."""
@@ -223,6 +238,33 @@ class PostTab(QWidget):
         self.schedule_datetime.setEnabled(checked)
         self.post_btn.setText("予約する" if checked else "投稿する")
 
+    def _connect_bridge_signals(self) -> None:
+        """ブリッジシグナルを接続する."""
+        if self._bridge is None:
+            return
+        self._bridge.post_success.connect(self._on_post_success)
+        self._bridge.post_failed.connect(self._on_post_failed)
+
+    def _on_post_success(self, message: str) -> None:
+        """投稿成功時の処理."""
+        self.post_btn.setEnabled(True)
+        self.post_btn.setText(
+            "予約する" if self.schedule_check.isChecked() else "投稿する",
+        )
+        QMessageBox.information(self, "成功", message)
+        # フォームクリア
+        self.text_edit.clear()
+        self._clear_images()
+        self.schedule_check.setChecked(False)
+
+    def _on_post_failed(self, message: str) -> None:
+        """投稿失敗時の処理."""
+        self.post_btn.setEnabled(True)
+        self.post_btn.setText(
+            "予約する" if self.schedule_check.isChecked() else "投稿する",
+        )
+        QMessageBox.warning(self, "エラー", message)
+
     def _on_post(self) -> None:
         """投稿ボタンクリック."""
         text = self.text_edit.toPlainText().strip()
@@ -238,18 +280,50 @@ class PostTab(QWidget):
                 QMessageBox.warning(self, "日時エラー", "未来の日時を指定してください")
                 return
 
-        # TODO: ブラウザ自動操作を呼び出して投稿
-        msg = "予約登録" if scheduled_at else "投稿"
-        logger.info(f"{msg}: {text[:30]}... (画像: {len(self._image_paths)}枚)")
-
-        QMessageBox.information(
-            self, "確認", f"{msg}しました！\n（テストモード: 実際の投稿は行われません）"
-        )
-
-        # フォームクリア
-        self.text_edit.clear()
-        self._clear_images()
-        self.schedule_check.setChecked(False)
+        if scheduled_at:
+            # 予約投稿: ScheduledJob を作成してシグナル発火
+            job = ScheduledJob(
+                job_type=JobType.POST,
+                scheduled_at=scheduled_at,
+                text=text,
+                image_paths=[str(p) for p in self._image_paths],
+            )
+            self.post_scheduled.emit(job)
+            logger.info(
+                f"予約登録: {text[:30]}... "
+                f"(画像: {len(self._image_paths)}枚)",
+            )
+            QMessageBox.information(self, "確認", "予約登録しました！")
+            # フォームクリア
+            self.text_edit.clear()
+            self._clear_images()
+            self.schedule_check.setChecked(False)
+        elif self._bridge:
+            # 即時投稿: ブリッジ経由で投稿
+            self.post_btn.setEnabled(False)
+            self.post_btn.setText("投稿中…")
+            self._bridge.create_post(
+                text=text,
+                image_paths=self._image_paths or None,
+            )
+            logger.info(
+                f"投稿: {text[:30]}... "
+                f"(画像: {len(self._image_paths)}枚)",
+            )
+        else:
+            # ブリッジ未接続時のフォールバック
+            logger.info(
+                f"投稿(テスト): {text[:30]}... "
+                f"(画像: {len(self._image_paths)}枚)",
+            )
+            QMessageBox.information(
+                self,
+                "確認",
+                "投稿しました！\n（テストモード: 実際の投稿は行われません）",
+            )
+            self.text_edit.clear()
+            self._clear_images()
+            self.schedule_check.setChecked(False)
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
         """ドラッグ開始."""

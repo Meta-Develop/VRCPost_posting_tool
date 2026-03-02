@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from loguru import logger
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
@@ -21,19 +23,32 @@ from PySide6.QtWidgets import (
 
 from src.config.settings import AppSettings
 
+if TYPE_CHECKING:
+    from src.scheduler.connector import SchedulerConnector
+
 
 class ScheduleTab(QWidget):
     """スケジュール管理タブ."""
 
-    def __init__(self, settings: AppSettings, parent=None) -> None:
+    def __init__(
+        self,
+        settings: AppSettings,
+        connector: SchedulerConnector | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self.settings = settings
+        self._connector = connector
         self._setup_ui()
+        self._connect_connector_signals()
 
         # 30秒ごとにスケジュール一覧を更新
         self._refresh_timer = QTimer()
         self._refresh_timer.timeout.connect(self._refresh_schedule)
         self._refresh_timer.start(30000)
+
+        # 初回読み込み
+        self._refresh_schedule()
 
     def _setup_ui(self) -> None:
         """UIを構築."""
@@ -87,10 +102,54 @@ class ScheduleTab(QWidget):
         self.status_label.setStyleSheet("color: #999;")
         layout.addWidget(self.status_label)
 
+    def _connect_connector_signals(self) -> None:
+        """コネクタシグナルを接続する."""
+        if self._connector is None:
+            return
+        self._connector.job_started.connect(self._on_job_started)
+        self._connector.job_completed.connect(self._on_job_completed)
+        self._connector.job_failed.connect(self._on_job_failed)
+
+    def _on_job_started(self, job_id: str) -> None:
+        """ジョブ開始時にテーブルのステータスを更新."""
+        self._update_job_status(job_id, "実行中")
+
+    def _on_job_completed(self, job_id: str) -> None:
+        """ジョブ完了時にテーブルのステータスを更新."""
+        self._update_job_status(job_id, "完了")
+
+    def _on_job_failed(self, job_id: str, _message: str) -> None:
+        """ジョブ失敗時にテーブルのステータスを更新."""
+        self._update_job_status(job_id, "失敗")
+
+    def _update_job_status(self, job_id: str, status: str) -> None:
+        """テーブル内の指定ジョブのステータスを更新."""
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, 0)
+            if item and item.text() == job_id:
+                self.table.setItem(row, 5, QTableWidgetItem(status))
+                break
+
+    def refresh_schedule(self) -> None:
+        """外部から呼び出し可能なスケジュール更新."""
+        self._refresh_schedule()
+
     def _refresh_schedule(self) -> None:
         """スケジュール一覧を更新."""
-        # TODO: SchedulerEngineからジョブ一覧を取得
         self.table.setRowCount(0)
+
+        if self._connector:
+            jobs = self._connector.get_jobs()
+            for job in jobs:
+                self.add_job_to_table(
+                    job_id=job.id,
+                    job_type=job.job_type.value,
+                    scheduled_at=job.display_time,
+                    text=job.text,
+                    image_count=len(job.image_paths),
+                    status=job.display_status,
+                )
+
         self.status_label.setText(f"ジョブ: {self.table.rowCount()}件")
         logger.debug("スケジュール一覧を更新")
 
@@ -142,7 +201,8 @@ class ScheduleTab(QWidget):
         )
 
         if reply == QMessageBox.StandardButton.Yes:
-            # TODO: SchedulerEngineからジョブを削除
+            if self._connector:
+                self._connector.remove_job(job_id)
             self.table.removeRow(row)
             self.status_label.setText(f"ジョブ: {self.table.rowCount()}件")
             logger.info(f"ジョブキャンセル: {job_id}")
