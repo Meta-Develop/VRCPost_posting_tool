@@ -1,0 +1,47 @@
+# Agent files (local only)
+.agent/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.env
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+*.log
+*.bak
+*.tmp
+temp_*
+debug_*
+screenshots/
+test_server/logs/
+
+# Credentials
+config/credentials.json
+config/cookies.json
+config/*.cookie
+config/browser_data/
+config/scheduled_jobs.json
+
+# Uploads
+tests/test_server/uploads/
+
+# Build outputs
+*.tar.gz
+*.zip
