@@ -23,8 +23,10 @@ from PySide6.QtWidgets import (
 
 from src.browser.bridge import BrowserBridge
 from src.config.settings import AppSettings
+from src.gui.log_tab import LogTab
 from src.gui.post_tab import PostTab
 from src.gui.schedule_tab import ScheduleTab
+from src.gui.settings_tab import SettingsTab
 from src.gui.story_tab import StoryTab
 from src.scheduler.connector import SchedulerConnector
 from src.scheduler.engine import SchedulerEngine
@@ -86,6 +88,14 @@ class MainWindow(QMainWindow):
         # スケジュールタブ
         self.schedule_tab = ScheduleTab(self.settings, self._connector)
         self.tabs.addTab(self.schedule_tab, "スケジュール")
+
+        # 設定タブ
+        self.settings_tab = SettingsTab(self.settings)
+        self.tabs.addTab(self.settings_tab, "設定")
+
+        # ログタブ
+        self.log_tab = LogTab()
+        self.tabs.addTab(self.log_tab, "ログ")
 
     def _setup_menu_bar(self) -> None:
         """メニューバーを設定."""
@@ -219,6 +229,7 @@ class MainWindow(QMainWindow):
             event.ignore()
         else:
             # リソース解放
+            self.log_tab.cleanup()
             self._connector.stop()
             self._bridge.shutdown()
             logger.info("アプリケーション終了")
