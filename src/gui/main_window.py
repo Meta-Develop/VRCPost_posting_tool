@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 
 from src.browser.bridge import BrowserBridge
 from src.config.settings import AppSettings
+from src.gui.calendar_tab import CalendarTab
 from src.gui.log_tab import LogTab
 from src.gui.post_tab import PostTab
 from src.gui.random_post_tab import RandomPostTab
@@ -32,6 +33,7 @@ from src.gui.story_tab import StoryTab
 from src.scheduler.connector import SchedulerConnector
 from src.scheduler.engine import SchedulerEngine
 from src.utils.logger import setup_logger
+from src.utils.notifier import NotificationManager
 
 
 class MainWindow(QMainWindow):
@@ -90,6 +92,10 @@ class MainWindow(QMainWindow):
         self.random_post_tab = RandomPostTab(self.settings, self._bridge)
         self.tabs.addTab(self.random_post_tab, "ランダム投稿")
 
+        # カレンダータブ
+        self.calendar_tab = CalendarTab(self.settings, self._connector)
+        self.tabs.addTab(self.calendar_tab, "カレンダー")
+
         # スケジュールタブ
         self.schedule_tab = ScheduleTab(self.settings, self._connector)
         self.tabs.addTab(self.schedule_tab, "スケジュール")
@@ -140,6 +146,8 @@ class MainWindow(QMainWindow):
     def _setup_system_tray(self) -> None:
         """システムトレイアイコンを設定."""
         if not QSystemTrayIcon.isSystemTrayAvailable():
+            # トレイなしでも通知マネージャーは作る
+            self._notifier = NotificationManager(parent=self)
             return
 
         self.tray_icon = QSystemTrayIcon(self)
@@ -157,6 +165,9 @@ class MainWindow(QMainWindow):
         self.tray_icon.activated.connect(self._on_tray_activated)
         self.tray_icon.show()
 
+        # 通知マネージャー
+        self._notifier = NotificationManager(tray_icon=self.tray_icon, parent=self)
+
     def _connect_signals(self) -> None:
         """シグナルを接続する."""
         # ブリッジのステータス変更をステータスバーに反映
@@ -170,6 +181,19 @@ class MainWindow(QMainWindow):
         self.post_tab.post_scheduled.connect(self._on_job_scheduled)
         self.story_tab.story_scheduled.connect(self._on_job_scheduled)
         self.random_post_tab.post_scheduled.connect(self._on_job_scheduled)
+
+        # コネクターのジョブ完了/失敗を通知
+        self._connector.job_completed.connect(self._on_job_completed_notify)
+        self._connector.job_failed.connect(self._on_job_failed_notify)
+
+        # 投稿成功/失敗を通知
+        self._bridge.post_success.connect(self._notifier.notify_success)
+        self._bridge.post_failed.connect(self._notifier.notify_error)
+        self._bridge.story_success.connect(self._notifier.notify_success)
+        self._bridge.story_failed.connect(self._notifier.notify_error)
+
+        # ランダム投稿の画像残数警告
+        self.random_post_tab.images_running_low.connect(self._on_images_low)
 
     # ── スロット ─────────────────────────────────────
 
@@ -203,7 +227,26 @@ class MainWindow(QMainWindow):
         """他タブからの予約ジョブを受け取る."""
         job_id = self._connector.add_job(job)
         self.schedule_tab.refresh_schedule()
+        self.calendar_tab.refresh()
         logger.info(f"ジョブ予約: {job_id}")
+
+    def _on_job_completed_notify(self, job_id: str) -> None:
+        """スケジュールジョブ完了時の通知."""
+        self._notifier.notify_schedule(f"ジョブ {job_id} が完了しました")
+        self.calendar_tab.refresh()
+
+    def _on_job_failed_notify(self, job_id: str, message: str) -> None:
+        """スケジュールジョブ失敗時の通知."""
+        self._notifier.notify_error(f"ジョブ {job_id} 失敗: {message}")
+
+    def _on_images_low(self, dir_path: str, remaining: int, total: int) -> None:
+        """画像残数が少ない時の通知."""
+        from pathlib import Path
+        folder = Path(dir_path).name
+        self._notifier.notify_warning(
+            f"「{folder}」の未使用画像が残り {remaining} 枚です！\n"
+            f"(全{total}枚中)"
+        )
 
     def _quit_app(self) -> None:
         """アプリケーションを終了する."""
@@ -235,6 +278,7 @@ class MainWindow(QMainWindow):
             event.ignore()
         else:
             # リソース解放
+            self._notifier.cleanup()
             self.log_tab.cleanup()
             self._connector.stop()
             self._bridge.shutdown()
