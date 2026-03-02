@@ -7,10 +7,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from loguru import logger
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -27,16 +27,30 @@ from PySide6.QtWidgets import (
 )
 
 from src.config.settings import AppSettings
+from src.scheduler.jobs import JobType, ScheduledJob
+
+if TYPE_CHECKING:
+    from src.browser.bridge import BrowserBridge
 
 
 class StoryTab(QWidget):
     """ストーリー管理タブ."""
 
-    def __init__(self, settings: AppSettings, parent=None) -> None:
+    # 予約ジョブを通知するシグナル
+    story_scheduled = Signal(object)
+
+    def __init__(
+        self,
+        settings: AppSettings,
+        bridge: BrowserBridge | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self.settings = settings
+        self._bridge = bridge
         self._image_path: Optional[Path] = None
         self._setup_ui()
+        self._connect_bridge_signals()
 
     def _setup_ui(self) -> None:
         """UIを構築."""
@@ -133,24 +147,71 @@ class StoryTab(QWidget):
         )
         self.preview_label.setPixmap(scaled)
 
+    def _connect_bridge_signals(self) -> None:
+        """ブリッジシグナルを接続する."""
+        if self._bridge is None:
+            return
+        self._bridge.story_success.connect(self._on_story_success)
+        self._bridge.story_failed.connect(self._on_story_failed)
+
+    def _on_story_success(self) -> None:
+        """ストーリーアップロード成功時の処理."""
+        self.upload_btn.setEnabled(True)
+        self.upload_btn.setText("ストーリーを投稿")
+        QMessageBox.information(self, "成功", "ストーリーを投稿しました！")
+        self._reset_form()
+
+    def _on_story_failed(self, message: str) -> None:
+        """ストーリーアップロード失敗時の処理."""
+        self.upload_btn.setEnabled(True)
+        self.upload_btn.setText("ストーリーを投稿")
+        QMessageBox.warning(self, "エラー", message)
+
+    def _reset_form(self) -> None:
+        """フォームをリセットする."""
+        self._image_path = None
+        self.filename_label.setText("未選択")
+        self.preview_label.clear()
+        self.preview_label.setText("画像を選択またはドラッグ＆ドロップ")
+        self.text_input.clear()
+
     def _on_upload(self) -> None:
         """アップロードボタンクリック."""
         if not self._image_path:
             QMessageBox.warning(self, "エラー", "画像を選択してください")
             return
 
-        _text = self.text_input.text().strip()  # noqa: F841
+        text = self.text_input.text().strip() or None
 
-        # TODO: ブラウザ自動操作でストーリーをアップロード
-        logger.info(f"ストーリー投稿: {self._image_path.name}")
-
-        QMessageBox.information(
-            self, "確認", "ストーリーを投稿しました！\n（テストモード: 実際の投稿は行われません）"
-        )
-
-        # フォームリセット
-        self._image_path = None
-        self.filename_label.setText("未選択")
-        self.preview_label.clear()
-        self.preview_label.setText("画像を選択またはドラッグ＆ドロップ")
-        self.text_input.clear()
+        if self.schedule_check.isChecked():
+            # 定期更新: ScheduledJob を作成してシグナル発火
+            scheduled_dt = self.update_time.dateTime().toPython()
+            job = ScheduledJob(
+                job_type=JobType.STORY,
+                scheduled_at=scheduled_dt,
+                text=text or "",
+                image_paths=[str(self._image_path)],
+            )
+            self.story_scheduled.emit(job)
+            logger.info(f"ストーリー予約登録: {self._image_path.name}")
+            QMessageBox.information(self, "確認", "ストーリーを予約登録しました！")
+            self._reset_form()
+        elif self._bridge:
+            # 即時アップロード: ブリッジ経由
+            self.upload_btn.setEnabled(False)
+            self.upload_btn.setText("アップロード中…")
+            self._bridge.upload_story(
+                image_path=self._image_path,
+                text=text,
+            )
+            logger.info(f"ストーリー投稿: {self._image_path.name}")
+        else:
+            # ブリッジ未接続時のフォールバック
+            logger.info(f"ストーリー投稿(テスト): {self._image_path.name}")
+            QMessageBox.information(
+                self,
+                "確認",
+                "ストーリーを投稿しました！\n"
+                "（テストモード: 実際の投稿は行われません）",
+            )
+            self._reset_form()
