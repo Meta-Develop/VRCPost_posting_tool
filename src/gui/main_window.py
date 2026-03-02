@@ -25,6 +25,7 @@ from src.browser.bridge import BrowserBridge
 from src.config.settings import AppSettings
 from src.gui.log_tab import LogTab
 from src.gui.post_tab import PostTab
+from src.gui.random_post_tab import RandomPostTab
 from src.gui.schedule_tab import ScheduleTab
 from src.gui.settings_tab import SettingsTab
 from src.gui.story_tab import StoryTab
@@ -84,6 +85,10 @@ class MainWindow(QMainWindow):
         # ストーリータブ
         self.story_tab = StoryTab(self.settings, self._bridge)
         self.tabs.addTab(self.story_tab, "ストーリー")
+
+        # ランダム投稿タブ
+        self.random_post_tab = RandomPostTab(self.settings, self._bridge)
+        self.tabs.addTab(self.random_post_tab, "ランダム投稿")
 
         # スケジュールタブ
         self.schedule_tab = ScheduleTab(self.settings, self._connector)
@@ -164,6 +169,7 @@ class MainWindow(QMainWindow):
         # 投稿タブの予約シグナルをスケジュールタブに接続
         self.post_tab.post_scheduled.connect(self._on_job_scheduled)
         self.story_tab.story_scheduled.connect(self._on_job_scheduled)
+        self.random_post_tab.post_scheduled.connect(self._on_job_scheduled)
 
     # ── スロット ─────────────────────────────────────
 
