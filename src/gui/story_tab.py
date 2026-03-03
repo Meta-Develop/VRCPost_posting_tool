@@ -1,217 +1,111 @@
-"""ストーリータブ.
+"""ストーリータブ (CustomTkinter).
 
-ストーリーのアップロード・スケジュール管理を行うタブ。
+ストーリー画像アップロードの UI を提供する。
 """
 
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from tkinter import filedialog
+from typing import TYPE_CHECKING
 
+import customtkinter as ctk
 from loguru import logger
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import (
-    QCheckBox,
-    QDateTimeEdit,
-    QFileDialog,
-    QGroupBox,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QMessageBox,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
-
-from src.config.settings import AppSettings
-from src.scheduler.jobs import JobType, ScheduledJob
+from PIL import Image
 
 if TYPE_CHECKING:
-    from src.browser.bridge import BrowserBridge
+    from src.gui.main_window import App
+
+PREVIEW_SIZE = (200, 200)
 
 
-class StoryTab(QWidget):
-    """ストーリー管理タブ."""
+class StoryTab(ctk.CTkFrame):
+    """ストーリータブ."""
 
-    # 予約ジョブを通知するシグナル
-    story_scheduled = Signal(object)
+    def __init__(self, parent: ctk.CTkFrame, app: App) -> None:
+        super().__init__(parent, fg_color="transparent")
+        self.app = app
+        self._image_path: Path | None = None
+        self._build_ui()
 
-    def __init__(
-        self,
-        settings: AppSettings,
-        bridge: BrowserBridge | None = None,
-        parent: QWidget | None = None,
-    ) -> None:
-        super().__init__(parent)
-        self.settings = settings
-        self._bridge = bridge
-        self._image_path: Optional[Path] = None
-        self._setup_ui()
-        self._connect_bridge_signals()
+    def _build_ui(self) -> None:
+        ctk.CTkLabel(
+            self, text="ストーリー", font=ctk.CTkFont(size=22, weight="bold")
+        ).pack(anchor="w", pady=(0, 12))
 
-    def _setup_ui(self) -> None:
-        """UIを構築."""
-        layout = QVBoxLayout(self)
-        layout.setSpacing(12)
-        layout.setContentsMargins(16, 16, 16, 16)
-
-        # ストーリー画像
-        image_group = QGroupBox("ストーリー画像")
-        image_layout = QVBoxLayout(image_group)
-
-        select_layout = QHBoxLayout()
-        self.select_btn = QPushButton("画像を選択")
-        self.select_btn.clicked.connect(self._select_image)
-        select_layout.addWidget(self.select_btn)
-
-        self.filename_label = QLabel("未選択")
-        self.filename_label.setStyleSheet("color: #999;")
-        select_layout.addWidget(self.filename_label)
-        select_layout.addStretch()
-        image_layout.addLayout(select_layout)
+        # 画像選択
+        sel_frame = ctk.CTkFrame(self, fg_color="transparent")
+        sel_frame.pack(fill="x")
+        ctk.CTkButton(
+            sel_frame,
+            text="画像を選択",
+            width=120,
+            height=32,
+            corner_radius=6,
+            command=self._select_image,
+        ).pack(side="left")
+        self._path_label = ctk.CTkLabel(
+            sel_frame, text="未選択", text_color="gray", font=ctk.CTkFont(size=12)
+        )
+        self._path_label.pack(side="left", padx=12)
 
         # プレビュー
-        self.preview_label = QLabel()
-        self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview_label.setMinimumHeight(200)
-        self.preview_label.setStyleSheet(
-            "QLabel { background: #1a1a1a; border: 2px dashed #333; border-radius: 8px; }"
+        self._preview_frame = ctk.CTkFrame(self, height=220, corner_radius=8)
+        self._preview_frame.pack(fill="x", pady=(8, 12))
+        self._preview_label = ctk.CTkLabel(
+            self._preview_frame, text="画像なし", text_color="gray"
         )
-        self.preview_label.setText("画像を選択またはドラッグ＆ドロップ")
-        image_layout.addWidget(self.preview_label)
-
-        layout.addWidget(image_group)
+        self._preview_label.pack(expand=True, pady=20)
 
         # テキスト
-        text_group = QGroupBox("テキスト（任意）")
-        text_layout = QVBoxLayout(text_group)
-        self.text_input = QLineEdit()
-        self.text_input.setPlaceholderText("ストーリーのテキスト...")
-        text_layout.addWidget(self.text_input)
-        layout.addWidget(text_group)
-
-        # スケジュール設定
-        schedule_group = QGroupBox("定期更新")
-        schedule_layout = QVBoxLayout(schedule_group)
-
-        self.schedule_check = QCheckBox("定期更新を有効にする")
-        schedule_layout.addWidget(self.schedule_check)
-
-        time_layout = QHBoxLayout()
-        time_layout.addWidget(QLabel("更新時間:"))
-        self.update_time = QDateTimeEdit()
-        self.update_time.setDisplayFormat("HH:mm")
-        self.update_time.setDateTime(datetime.now().replace(hour=12, minute=0))
-        time_layout.addWidget(self.update_time)
-        time_layout.addStretch()
-        schedule_layout.addLayout(time_layout)
-
-        layout.addWidget(schedule_group)
-
-        # アクションボタン
-        btn_row = QHBoxLayout()
-        btn_row.addStretch()
-
-        self.upload_btn = QPushButton("ストーリーを投稿")
-        self.upload_btn.setFixedSize(180, 40)
-        self.upload_btn.setStyleSheet(
-            "QPushButton { background: #6366f1; color: white; border: none; "
-            "border-radius: 8px; font-size: 14px; font-weight: bold; }"
-            "QPushButton:hover { background: #818cf8; }"
+        ctk.CTkLabel(self, text="テキスト（任意）", font=ctk.CTkFont(size=13)).pack(
+            anchor="w"
         )
-        self.upload_btn.clicked.connect(self._on_upload)
-        btn_row.addWidget(self.upload_btn)
+        self._text = ctk.CTkTextbox(self, height=80, corner_radius=8)
+        self._text.pack(fill="x", pady=(4, 12))
 
-        layout.addLayout(btn_row)
-        layout.addStretch()
+        # アップロードボタン
+        ctk.CTkButton(
+            self,
+            text="ストーリーをアップロード",
+            height=40,
+            corner_radius=8,
+            fg_color="#6366f1",
+            hover_color="#818cf8",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            command=self._do_upload,
+        ).pack(fill="x", pady=(8, 0))
 
     def _select_image(self) -> None:
-        """画像を選択."""
-        file, _ = QFileDialog.getOpenFileName(
-            self, "ストーリー画像を選択", "", "画像ファイル (*.jpg *.jpeg *.png *.gif *.webp)"
+        path = filedialog.askopenfilename(
+            title="ストーリー画像を選択",
+            filetypes=[("画像", "*.jpg *.jpeg *.png *.gif *.webp *.bmp")],
         )
-        if file:
-            self._set_image(Path(file))
-
-    def _set_image(self, path: Path) -> None:
-        """画像を設定."""
-        self._image_path = path
-        self.filename_label.setText(path.name)
-
-        pixmap = QPixmap(str(path))
-        scaled = pixmap.scaled(
-            400, 300, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
-        )
-        self.preview_label.setPixmap(scaled)
-
-    def _connect_bridge_signals(self) -> None:
-        """ブリッジシグナルを接続する."""
-        if self._bridge is None:
+        if not path:
             return
-        self._bridge.story_success.connect(self._on_story_success)
-        self._bridge.story_failed.connect(self._on_story_failed)
+        self._image_path = Path(path)
+        self._path_label.configure(text=self._image_path.name)
+        self._show_preview()
 
-    def _on_story_success(self) -> None:
-        """ストーリーアップロード成功時の処理."""
-        self.upload_btn.setEnabled(True)
-        self.upload_btn.setText("ストーリーを投稿")
-        QMessageBox.information(self, "成功", "ストーリーを投稿しました！")
-        self._reset_form()
-
-    def _on_story_failed(self, message: str) -> None:
-        """ストーリーアップロード失敗時の処理."""
-        self.upload_btn.setEnabled(True)
-        self.upload_btn.setText("ストーリーを投稿")
-        QMessageBox.warning(self, "エラー", message)
-
-    def _reset_form(self) -> None:
-        """フォームをリセットする."""
-        self._image_path = None
-        self.filename_label.setText("未選択")
-        self.preview_label.clear()
-        self.preview_label.setText("画像を選択またはドラッグ＆ドロップ")
-        self.text_input.clear()
-
-    def _on_upload(self) -> None:
-        """アップロードボタンクリック."""
+    def _show_preview(self) -> None:
+        for w in self._preview_frame.winfo_children():
+            w.destroy()
         if not self._image_path:
-            QMessageBox.warning(self, "エラー", "画像を選択してください")
             return
+        try:
+            img = Image.open(self._image_path)
+            img.thumbnail(PREVIEW_SIZE)
+            ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=img.size)
+            ctk.CTkLabel(self._preview_frame, image=ctk_img, text="").pack(
+                expand=True, pady=8
+            )
+        except Exception as exc:
+            logger.warning(f"プレビュー失敗: {exc}")
 
-        text = self.text_input.text().strip() or None
-
-        if self.schedule_check.isChecked():
-            # 定期更新: ScheduledJob を作成してシグナル発火
-            scheduled_dt = self.update_time.dateTime().toPython()
-            job = ScheduledJob(
-                job_type=JobType.STORY,
-                scheduled_at=scheduled_dt,
-                text=text or "",
-                image_paths=[str(self._image_path)],
-            )
-            self.story_scheduled.emit(job)
-            logger.info(f"ストーリー予約登録: {self._image_path.name}")
-            QMessageBox.information(self, "確認", "ストーリーを予約登録しました！")
-            self._reset_form()
-        elif self._bridge:
-            # 即時アップロード: ブリッジ経由
-            self.upload_btn.setEnabled(False)
-            self.upload_btn.setText("アップロード中…")
-            self._bridge.upload_story(
-                image_path=self._image_path,
-                text=text,
-            )
-            logger.info(f"ストーリー投稿: {self._image_path.name}")
-        else:
-            # ブリッジ未接続時のフォールバック
-            logger.info(f"ストーリー投稿(テスト): {self._image_path.name}")
-            QMessageBox.information(
-                self,
-                "確認",
-                "ストーリーを投稿しました！\n"
-                "（テストモード: 実際の投稿は行われません）",
-            )
-            self._reset_form()
+    def _do_upload(self) -> None:
+        if not self._image_path:
+            self.app.notifier.warning("入力エラー", "画像を選択してください")
+            return
+        text = self._text.get("1.0", "end").strip() or None
+        self.app.bridge.upload_story(str(self._image_path), text)
+        self.app.notifier.info("ストーリー", "アップロードを送信しました")

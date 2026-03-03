@@ -1,238 +1,202 @@
-"""設定タブ.
+"""設定タブ (CustomTkinter).
 
-アプリケーションの設定を管理するタブ。
+アプリケーション設定の表示・編集を提供する。
 """
 
 from __future__ import annotations
 
-from loguru import logger
-from PySide6.QtCore import Signal
-from PySide6.QtWidgets import (
-    QCheckBox,
-    QFormLayout,
-    QGroupBox,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QMessageBox,
-    QPushButton,
-    QSpinBox,
-    QVBoxLayout,
-    QWidget,
-)
+from typing import TYPE_CHECKING
 
-from src.config.settings import AppSettings
+import customtkinter as ctk
+
+if TYPE_CHECKING:
+    from src.gui.main_window import App
 
 
-class SettingsTab(QWidget):
-    """設定管理タブ."""
+class SettingsTab(ctk.CTkFrame):
+    """設定タブ."""
 
-    settings_changed = Signal()
-
-    def __init__(
-        self,
-        settings: AppSettings,
-        parent: QWidget | None = None,
-    ) -> None:
-        super().__init__(parent)
-        self.settings = settings
-        self._setup_ui()
+    def __init__(self, parent: ctk.CTkFrame, app: App) -> None:
+        super().__init__(parent, fg_color="transparent")
+        self.app = app
+        self._entries: dict[str, ctk.CTkEntry | ctk.CTkSwitch] = {}
+        self._vars: dict[str, ctk.BooleanVar] = {}
+        self._build_ui()
         self._load_values()
-        self._connect_signals()
-        logger.debug("設定タブを初期化しました")
 
-    # ------------------------------------------------------------------
-    # UI構築
-    # ------------------------------------------------------------------
+    # ── UI 構築 ──
 
-    def _setup_ui(self) -> None:
-        """UIを構築."""
-        root = QVBoxLayout(self)
+    def _build_ui(self) -> None:
+        ctk.CTkLabel(
+            self, text="設定", font=ctk.CTkFont(size=22, weight="bold")
+        ).pack(anchor="w", pady=(0, 12))
 
-        # ─── 接続設定 ──────────────────────────────────────
-        conn_group = QGroupBox("接続設定")
-        conn_form = QFormLayout(conn_group)
+        scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        scroll.pack(fill="both", expand=True)
 
-        self._test_mode_cb = QCheckBox("テストモードを使用する")
-        conn_form.addRow(self._test_mode_cb)
+        # ── 接続 ──
+        self._section(scroll, "接続設定")
+        self._add_entry(scroll, "base_url", "本番 URL")
+        self._add_entry(scroll, "test_server_url", "テストサーバー URL")
+        self._add_switch(scroll, "test_mode", "テストモード")
 
-        self._test_server_url = QLineEdit()
-        conn_form.addRow("テストサーバURL:", self._test_server_url)
+        # ── ブラウザ ──
+        self._section(scroll, "ブラウザ設定")
+        self._add_switch(scroll, "headless", "ヘッドレスモード")
+        self._add_entry(scroll, "timeout_ms", "タイムアウト (ms)")
+        self._add_entry(scroll, "slow_mo", "スローモーション (ms)")
 
-        self._base_url = QLineEdit()
-        self._base_url.setReadOnly(True)
-        conn_form.addRow("本番URL:", self._base_url)
+        # ── 投稿 ──
+        self._section(scroll, "投稿設定")
+        self._add_entry(scroll, "max_images", "最大画像数")
+        self._add_entry(scroll, "image_max_size_kb", "画像最大サイズ (KB)")
+        self._add_entry(scroll, "image_max_width", "画像最大幅 (px)")
+        self._add_entry(scroll, "image_max_height", "画像最大高さ (px)")
+        self._add_entry(scroll, "default_hashtags", "デフォルトハッシュタグ")
 
-        self._active_url_label = QLabel()
-        self._active_url_label.setStyleSheet(
-            "color: #6366f1; font-weight: bold;"
-        )
-        conn_form.addRow("アクティブURL:", self._active_url_label)
+        # ── スケジューラー ──
+        self._section(scroll, "スケジューラー設定")
+        self._add_entry(scroll, "timezone", "タイムゾーン")
+        self._add_entry(scroll, "max_retries", "最大リトライ")
+        self._add_entry(scroll, "retry_interval_sec", "リトライ間隔 (秒)")
 
-        root.addWidget(conn_group)
+        # ボタン
+        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
+        btn_frame.pack(fill="x", pady=(12, 0))
+        ctk.CTkButton(
+            btn_frame,
+            text="保存",
+            height=36,
+            corner_radius=8,
+            fg_color="#6366f1",
+            hover_color="#818cf8",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            command=self._save,
+        ).pack(side="left", expand=True, fill="x", padx=(0, 4))
+        ctk.CTkButton(
+            btn_frame,
+            text="リセット",
+            height=36,
+            corner_radius=8,
+            fg_color="gray40",
+            command=self._reset,
+        ).pack(side="left", width=100)
 
-        # ─── ブラウザ設定 ──────────────────────────────────
-        browser_group = QGroupBox("ブラウザ設定")
-        browser_form = QFormLayout(browser_group)
+    # ── ヘルパー ──
 
-        self._headless_cb = QCheckBox("ヘッドレスモード")
-        browser_form.addRow(self._headless_cb)
+    def _section(self, parent: ctk.CTkFrame, title: str) -> None:
+        ctk.CTkLabel(
+            parent,
+            text=title,
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color="#6366f1",
+        ).pack(anchor="w", pady=(16, 4))
 
-        self._timeout_ms = QSpinBox()
-        self._timeout_ms.setRange(1000, 120000)
-        self._timeout_ms.setSingleStep(1000)
-        self._timeout_ms.setSuffix(" ms")
-        browser_form.addRow("タイムアウト:", self._timeout_ms)
+    def _add_entry(self, parent: ctk.CTkFrame, key: str, label: str) -> None:
+        row = ctk.CTkFrame(parent, fg_color="transparent")
+        row.pack(fill="x", pady=2)
+        ctk.CTkLabel(row, text=label, width=180, anchor="w").pack(side="left")
+        entry = ctk.CTkEntry(row, corner_radius=6)
+        entry.pack(side="left", expand=True, fill="x")
+        self._entries[key] = entry
 
-        self._slow_mo = QSpinBox()
-        self._slow_mo.setRange(0, 5000)
-        self._slow_mo.setSingleStep(50)
-        self._slow_mo.setSuffix(" ms")
-        browser_form.addRow("スローモーション:", self._slow_mo)
+    def _add_switch(self, parent: ctk.CTkFrame, key: str, label: str) -> None:
+        row = ctk.CTkFrame(parent, fg_color="transparent")
+        row.pack(fill="x", pady=2)
+        ctk.CTkLabel(row, text=label, width=180, anchor="w").pack(side="left")
+        var = ctk.BooleanVar()
+        sw = ctk.CTkSwitch(row, text="", variable=var)
+        sw.pack(side="left")
+        self._vars[key] = var
+        self._entries[key] = sw
 
-        root.addWidget(browser_group)
-
-        # ─── 投稿設定 ──────────────────────────────────────
-        post_group = QGroupBox("投稿設定")
-        post_form = QFormLayout(post_group)
-
-        self._max_images = QSpinBox()
-        self._max_images.setRange(1, 20)
-        post_form.addRow("最大画像数:", self._max_images)
-
-        self._image_max_kb = QSpinBox()
-        self._image_max_kb.setRange(256, 51200)
-        self._image_max_kb.setSingleStep(256)
-        self._image_max_kb.setSuffix(" KB")
-        post_form.addRow("画像最大サイズ:", self._image_max_kb)
-
-        root.addWidget(post_group)
-
-        # ─── スケジューラー設定 ────────────────────────────
-        sched_group = QGroupBox("スケジューラー設定")
-        sched_form = QFormLayout(sched_group)
-
-        self._timezone_label = QLabel()
-        sched_form.addRow("タイムゾーン:", self._timezone_label)
-
-        self._max_retries = QSpinBox()
-        self._max_retries.setRange(0, 10)
-        sched_form.addRow("最大リトライ回数:", self._max_retries)
-
-        self._retry_interval = QSpinBox()
-        self._retry_interval.setRange(10, 600)
-        self._retry_interval.setSingleStep(10)
-        self._retry_interval.setSuffix(" 秒")
-        sched_form.addRow("リトライ間隔:", self._retry_interval)
-
-        root.addWidget(sched_group)
-
-        # ─── ボタン行 ──────────────────────────────────────
-        btn_row = QHBoxLayout()
-        btn_row.addStretch()
-
-        self._reset_btn = QPushButton("デフォルトに戻す")
-        btn_row.addWidget(self._reset_btn)
-
-        self._save_btn = QPushButton("保存")
-        self._save_btn.setStyleSheet(
-            "QPushButton { background: #6366f1; color: white; border: none; "
-            "border-radius: 4px; padding: 6px 20px; font-weight: bold; }"
-            "QPushButton:hover { background: #818cf8; }"
-        )
-        btn_row.addWidget(self._save_btn)
-
-        root.addLayout(btn_row)
-        root.addStretch()
-
-    # ------------------------------------------------------------------
-    # 値の読み込み / 書き込み
-    # ------------------------------------------------------------------
+    # ── 値の読み書き ──
 
     def _load_values(self) -> None:
-        """現在の設定値をウィジェットに反映."""
-        s = self.settings
+        s = self.app.settings
+        mapping: dict[str, str] = {
+            "base_url": s.base_url,
+            "test_server_url": s.test_server_url,
+            "timeout_ms": str(s.browser.timeout_ms),
+            "slow_mo": str(s.browser.slow_mo),
+            "max_images": str(s.post.max_images),
+            "image_max_size_kb": str(s.post.image_max_size_kb),
+            "image_max_width": str(s.post.image_max_width),
+            "image_max_height": str(s.post.image_max_height),
+            "default_hashtags": ", ".join(s.post.default_hashtags),
+            "timezone": s.scheduler.timezone,
+            "max_retries": str(s.scheduler.max_retries),
+            "retry_interval_sec": str(s.scheduler.retry_interval_sec),
+        }
+        for key, val in mapping.items():
+            widget = self._entries.get(key)
+            if isinstance(widget, ctk.CTkEntry):
+                widget.delete(0, "end")
+                widget.insert(0, val)
 
-        self._test_mode_cb.setChecked(s.test_mode)
-        self._test_server_url.setText(s.test_server_url)
-        self._base_url.setText(s.base_url)
-        self._update_active_url()
+        self._vars.get("test_mode", ctk.BooleanVar()).set(s.test_mode)
+        self._vars.get("headless", ctk.BooleanVar()).set(s.browser.headless)
 
-        self._headless_cb.setChecked(s.browser.headless)
-        self._timeout_ms.setValue(s.browser.timeout_ms)
-        self._slow_mo.setValue(s.browser.slow_mo)
+    def _save(self) -> None:
+        s = self.app.settings
 
-        self._max_images.setValue(s.post.max_images)
-        self._image_max_kb.setValue(s.post.image_max_size_kb)
+        def _get(key: str) -> str:
+            w = self._entries.get(key)
+            if isinstance(w, ctk.CTkEntry):
+                return w.get().strip()
+            return ""
 
-        self._timezone_label.setText(s.scheduler.timezone)
-        self._max_retries.setValue(s.scheduler.max_retries)
-        self._retry_interval.setValue(s.scheduler.retry_interval_sec)
+        s.base_url = _get("base_url") or s.base_url
+        s.test_server_url = _get("test_server_url") or s.test_server_url
+        s.test_mode = self._vars.get("test_mode", ctk.BooleanVar()).get()
+        s.browser.headless = self._vars.get("headless", ctk.BooleanVar()).get()
 
-    def _apply_values(self) -> None:
-        """ウィジェットの値を設定オブジェクトに反映."""
-        s = self.settings
-
-        s.test_mode = self._test_mode_cb.isChecked()
-        s.test_server_url = self._test_server_url.text()
-
-        s.browser.headless = self._headless_cb.isChecked()
-        s.browser.timeout_ms = self._timeout_ms.value()
-        s.browser.slow_mo = self._slow_mo.value()
-
-        s.post.max_images = self._max_images.value()
-        s.post.image_max_size_kb = self._image_max_kb.value()
-
-        s.scheduler.max_retries = self._max_retries.value()
-        s.scheduler.retry_interval_sec = self._retry_interval.value()
-
-    # ------------------------------------------------------------------
-    # シグナル接続
-    # ------------------------------------------------------------------
-
-    def _connect_signals(self) -> None:
-        """シグナルを接続."""
-        self._save_btn.clicked.connect(self._on_save)
-        self._reset_btn.clicked.connect(self._on_reset)
-        self._test_mode_cb.toggled.connect(self._update_active_url)
-
-    # ------------------------------------------------------------------
-    # スロット
-    # ------------------------------------------------------------------
-
-    def _on_save(self) -> None:
-        """設定を保存."""
-        self._apply_values()
         try:
-            self.settings.save()
-            logger.info("設定を保存しました")
-            self.settings_changed.emit()
-        except OSError:
-            logger.error("設定の保存に失敗しました")
-            QMessageBox.critical(self, "エラー", "設定の保存に失敗しました。")
+            s.browser.timeout_ms = int(_get("timeout_ms"))
+        except ValueError:
+            pass
+        try:
+            s.browser.slow_mo = int(_get("slow_mo"))
+        except ValueError:
+            pass
+        try:
+            s.post.max_images = int(_get("max_images"))
+        except ValueError:
+            pass
+        try:
+            s.post.image_max_size_kb = int(_get("image_max_size_kb"))
+        except ValueError:
+            pass
+        try:
+            s.post.image_max_width = int(_get("image_max_width"))
+        except ValueError:
+            pass
+        try:
+            s.post.image_max_height = int(_get("image_max_height"))
+        except ValueError:
+            pass
 
-    def _on_reset(self) -> None:
-        """デフォルト値にリセット."""
-        reply = QMessageBox.question(
-            self,
-            "確認",
-            "設定をデフォルトに戻しますか？",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if reply == QMessageBox.StandardButton.Yes:
-            defaults = AppSettings()
-            self.settings.test_mode = defaults.test_mode
-            self.settings.test_server_url = defaults.test_server_url
-            self.settings.browser = defaults.browser
-            self.settings.post = defaults.post
-            self.settings.scheduler = defaults.scheduler
-            self._load_values()
-            logger.info("設定をデフォルトにリセットしました")
+        tags = _get("default_hashtags")
+        s.post.default_hashtags = [t.strip() for t in tags.split(",") if t.strip()]
 
-    def _update_active_url(self) -> None:
-        """アクティブURLラベルを更新."""
-        if self._test_mode_cb.isChecked():
-            url = self._test_server_url.text()
-        else:
-            url = self._base_url.text()
-        self._active_url_label.setText(url)
+        s.scheduler.timezone = _get("timezone") or s.scheduler.timezone
+        try:
+            s.scheduler.max_retries = int(_get("max_retries"))
+        except ValueError:
+            pass
+        try:
+            s.scheduler.retry_interval_sec = int(_get("retry_interval_sec"))
+        except ValueError:
+            pass
+
+        s.save()
+        self.app.notifier.info("設定", "設定を保存しました")
+
+        # モードラベル更新
+        mode_text = "テストモード" if s.test_mode else "本番モード"
+        color = "orange" if s.test_mode else "green"
+        self.app._mode_label.configure(text=mode_text, text_color=color)
+
+    def _reset(self) -> None:
+        self._load_values()
+        self.app.notifier.info("設定", "変更を元に戻しました")
