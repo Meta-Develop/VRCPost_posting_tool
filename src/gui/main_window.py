@@ -1,306 +1,262 @@
-"""メインウィンドウ.
+"""メインウィンドウ (CustomTkinter).
 
-アプリケーションのエントリーポイントとメインウィンドウを定義する。
+サイドバーナビゲーション + コンテンツ切替の
+モダンなシングルウィンドウ UI。
 """
 
 from __future__ import annotations
 
-import sys
-
+import customtkinter as ctk
 from loguru import logger
-from PySide6.QtWidgets import (
-    QApplication,
-    QMainWindow,
-    QMenu,
-    QMenuBar,
-    QPushButton,
-    QStatusBar,
-    QSystemTrayIcon,
-    QTabWidget,
-    QVBoxLayout,
-    QWidget,
-)
 
-from src.browser.bridge import BrowserBridge
 from src.config.settings import AppSettings
-from src.gui.calendar_tab import CalendarTab
-from src.gui.log_tab import LogTab
-from src.gui.post_tab import PostTab
-from src.gui.random_post_tab import RandomPostTab
-from src.gui.schedule_tab import ScheduleTab
-from src.gui.settings_tab import SettingsTab
-from src.gui.story_tab import StoryTab
-from src.scheduler.connector import SchedulerConnector
-from src.scheduler.engine import SchedulerEngine
+from src.gui.events import EventEmitter
 from src.utils.logger import setup_logger
-from src.utils.notifier import NotificationManager
+
+# ── 外観 ──
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
+
+SIDEBAR_W = 200
+ACCENT = "#6366f1"
+ACCENT_HOVER = "#818cf8"
 
 
-class MainWindow(QMainWindow):
+class App(ctk.CTk):
     """アプリケーションメインウィンドウ."""
 
     def __init__(self) -> None:
         super().__init__()
+        self.title("VRCPost Posting Tool")
+        self.geometry("1120x720")
+        self.minsize(900, 560)
 
-        # 設定読み込み
+        # ── 共有オブジェクト ──
         self.settings = AppSettings.load()
+        self.emitter = EventEmitter()
 
-        # ブラウザブリッジ起動
-        self._bridge = BrowserBridge(self.settings, parent=self)
-        self._bridge.start()
+        # ブラウザブリッジ (遅延起動)
+        from src.browser.bridge import BrowserBridge
 
-        # スケジューラー起動
+        self.bridge = BrowserBridge(self.settings, self.emitter)
+
+        # スケジューラー
+        from src.scheduler.connector import SchedulerConnector
+        from src.scheduler.engine import SchedulerEngine
+
         self._engine = SchedulerEngine(self.settings)
-        self._connector = SchedulerConnector(
-            self._engine, self._bridge, parent=self,
+        self.connector = SchedulerConnector(self._engine, self.bridge, self.emitter)
+
+        # 通知
+        from src.utils.notifier import NotificationManager
+
+        self.notifier = NotificationManager(self.emitter)
+
+        # ── UI 構築 ──
+        self._build_sidebar()
+        self._build_content()
+        self._build_statusbar()
+
+        # ── タブ生成 ──
+        self._tabs: dict[str, ctk.CTkFrame] = {}
+        self._create_tabs()
+        self._show_tab("post")
+
+        # ── イベント接続 ──
+        self._connect_events()
+
+        # ── 起動 ──
+        self.bridge.start()
+        self.connector.start()
+        self._poll_events()
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    # ── サイドバー ────────────────────────────────────
+
+    def _build_sidebar(self) -> None:
+        self.sidebar = ctk.CTkFrame(self, width=SIDEBAR_W, corner_radius=0)
+        self.sidebar.pack(side="left", fill="y")
+        self.sidebar.pack_propagate(False)
+
+        # タイトル
+        ctk.CTkLabel(
+            self.sidebar,
+            text="VRCPost",
+            font=ctk.CTkFont(size=20, weight="bold"),
+        ).pack(pady=(24, 2))
+        ctk.CTkLabel(
+            self.sidebar,
+            text="Posting Tool",
+            font=ctk.CTkFont(size=12),
+            text_color="gray",
+        ).pack(pady=(0, 20))
+
+        # ナビボタン
+        self._nav_buttons: dict[str, ctk.CTkButton] = {}
+        nav_items = [
+            ("post", "投稿"),
+            ("story", "ストーリー"),
+            ("random", "ランダム投稿"),
+            ("calendar", "カレンダー"),
+            ("schedule", "スケジュール"),
+            ("settings", "設定"),
+            ("log", "ログ"),
+        ]
+        for key, label in nav_items:
+            btn = ctk.CTkButton(
+                self.sidebar,
+                text=label,
+                fg_color="transparent",
+                text_color="gray90",
+                hover_color=("gray75", "gray30"),
+                anchor="w",
+                height=36,
+                corner_radius=8,
+                command=lambda k=key: self._show_tab(k),
+            )
+            btn.pack(fill="x", padx=12, pady=2)
+            self._nav_buttons[key] = btn
+
+        # スペーサー
+        ctk.CTkFrame(self.sidebar, fg_color="transparent").pack(expand=True)
+
+        # ログインボタン
+        self._login_btn = ctk.CTkButton(
+            self.sidebar,
+            text="ログイン",
+            fg_color=ACCENT,
+            hover_color=ACCENT_HOVER,
+            height=36,
+            corner_radius=8,
+            command=self._on_login,
         )
-        self._connector.start()
+        self._login_btn.pack(fill="x", padx=12, pady=(4, 4))
 
-        self._setup_ui()
-        self._setup_menu_bar()
-        self._setup_status_bar()
-        self._setup_system_tray()
-        self._connect_signals()
-
-        logger.info("アプリケーション起動")
-
-    def _setup_ui(self) -> None:
-        """UIを構築."""
-        self.setWindowTitle("VRCPost Posting Tool")
-        self.setMinimumSize(800, 600)
-        self.resize(1000, 700)
-
-        # 中央ウィジェット
-        central = QWidget()
-        self.setCentralWidget(central)
-        layout = QVBoxLayout(central)
-        layout.setContentsMargins(0, 0, 0, 0)
-
-        # タブウィジェット
-        self.tabs = QTabWidget()
-        layout.addWidget(self.tabs)
-
-        # 投稿タブ
-        self.post_tab = PostTab(self.settings, self._bridge)
-        self.tabs.addTab(self.post_tab, "投稿")
-
-        # ストーリータブ
-        self.story_tab = StoryTab(self.settings, self._bridge)
-        self.tabs.addTab(self.story_tab, "ストーリー")
-
-        # ランダム投稿タブ
-        self.random_post_tab = RandomPostTab(self.settings, self._bridge)
-        self.tabs.addTab(self.random_post_tab, "ランダム投稿")
-
-        # カレンダータブ
-        self.calendar_tab = CalendarTab(self.settings, self._connector)
-        self.tabs.addTab(self.calendar_tab, "カレンダー")
-
-        # スケジュールタブ
-        self.schedule_tab = ScheduleTab(self.settings, self._connector)
-        self.tabs.addTab(self.schedule_tab, "スケジュール")
-
-        # 設定タブ
-        self.settings_tab = SettingsTab(self.settings)
-        self.tabs.addTab(self.settings_tab, "設定")
-
-        # ログタブ
-        self.log_tab = LogTab()
-        self.tabs.addTab(self.log_tab, "ログ")
-
-    def _setup_menu_bar(self) -> None:
-        """メニューバーを設定."""
-        menu_bar: QMenuBar = self.menuBar()
-
-        # ファイルメニュー
-        file_menu = menu_bar.addMenu("ファイル")
-        quit_action = file_menu.addAction("終了")
-        quit_action.triggered.connect(self._quit_app)
-
-        # アカウントメニュー
-        account_menu = menu_bar.addMenu("アカウント")
-        self._login_action = account_menu.addAction("ログイン")
-        self._login_action.triggered.connect(self._on_login)
-
-    def _setup_status_bar(self) -> None:
-        """ステータスバーを設定."""
-        self.status_bar = QStatusBar()
-        self.setStatusBar(self.status_bar)
-
-        mode = "テストモード" if self.settings.test_mode else "本番モード"
-        url = self.settings.active_url
-        self._default_status = f"{mode} | {url}"
-        self.status_bar.showMessage(self._default_status)
-
-        # ステータスバーにログインボタンを配置
-        self._login_btn = QPushButton("ログイン")
-        self._login_btn.setFixedHeight(24)
-        self._login_btn.setStyleSheet(
-            "QPushButton { background: #6366f1; color: white; border: none; "
-            "border-radius: 4px; padding: 2px 12px; font-size: 12px; }"
-            "QPushButton:hover { background: #818cf8; }"
+        # モード表示
+        mode_text = "テストモード" if self.settings.test_mode else "本番モード"
+        self._mode_label = ctk.CTkLabel(
+            self.sidebar,
+            text=mode_text,
+            font=ctk.CTkFont(size=11),
+            text_color="orange" if self.settings.test_mode else "green",
         )
-        self._login_btn.clicked.connect(self._on_login)
-        self.status_bar.addPermanentWidget(self._login_btn)
+        self._mode_label.pack(pady=(0, 16))
 
-    def _setup_system_tray(self) -> None:
-        """システムトレイアイコンを設定."""
-        if not QSystemTrayIcon.isSystemTrayAvailable():
-            # トレイなしでも通知マネージャーは作る
-            self._notifier = NotificationManager(parent=self)
-            return
+    # ── コンテンツエリア ──────────────────────────────
 
-        self.tray_icon = QSystemTrayIcon(self)
-        self.tray_icon.setToolTip("VRCPost Posting Tool")
+    def _build_content(self) -> None:
+        self.content = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
+        self.content.pack(side="left", fill="both", expand=True)
 
-        # トレイメニュー
-        tray_menu = QMenu()
-        show_action = tray_menu.addAction("表示")
-        show_action.triggered.connect(self.show)
-        tray_menu.addSeparator()
-        quit_action = tray_menu.addAction("終了")
-        quit_action.triggered.connect(QApplication.quit)
+    # ── ステータスバー ────────────────────────────────
 
-        self.tray_icon.setContextMenu(tray_menu)
-        self.tray_icon.activated.connect(self._on_tray_activated)
-        self.tray_icon.show()
+    def _build_statusbar(self) -> None:
+        self._statusbar = ctk.CTkLabel(
+            self,
+            text="起動中...",
+            font=ctk.CTkFont(size=11),
+            text_color="gray",
+            anchor="w",
+            height=24,
+        )
+        self._statusbar.pack(side="bottom", fill="x", padx=8)
 
-        # 通知マネージャー
-        self._notifier = NotificationManager(tray_icon=self.tray_icon, parent=self)
+    # ── タブ管理 ──────────────────────────────────────
 
-    def _connect_signals(self) -> None:
-        """シグナルを接続する."""
-        # ブリッジのステータス変更をステータスバーに反映
-        self._bridge.status_changed.connect(self._on_status_changed)
+    def _create_tabs(self) -> None:
+        from src.gui.calendar_tab import CalendarTab
+        from src.gui.log_tab import LogTab
+        from src.gui.post_tab import PostTab
+        from src.gui.random_post_tab import RandomPostTab
+        from src.gui.schedule_tab import ScheduleTab
+        from src.gui.settings_tab import SettingsTab
+        from src.gui.story_tab import StoryTab
 
-        # ログイン結果
-        self._bridge.login_success.connect(self._on_login_success)
-        self._bridge.login_failed.connect(self._on_login_failed)
+        self._tabs["post"] = PostTab(self.content, self)
+        self._tabs["story"] = StoryTab(self.content, self)
+        self._tabs["random"] = RandomPostTab(self.content, self)
+        self._tabs["calendar"] = CalendarTab(self.content, self)
+        self._tabs["schedule"] = ScheduleTab(self.content, self)
+        self._tabs["settings"] = SettingsTab(self.content, self)
+        self._tabs["log"] = LogTab(self.content, self)
 
-        # 投稿タブの予約シグナルをスケジュールタブに接続
-        self.post_tab.post_scheduled.connect(self._on_job_scheduled)
-        self.story_tab.story_scheduled.connect(self._on_job_scheduled)
-        self.random_post_tab.post_scheduled.connect(self._on_job_scheduled)
+    def _show_tab(self, name: str) -> None:
+        for tab in self._tabs.values():
+            tab.pack_forget()
+        self._tabs[name].pack(fill="both", expand=True, padx=16, pady=16)
 
-        # コネクターのジョブ完了/失敗を通知
-        self._connector.job_completed.connect(self._on_job_completed_notify)
-        self._connector.job_failed.connect(self._on_job_failed_notify)
+        # ナビハイライト
+        for key, btn in self._nav_buttons.items():
+            if key == name:
+                btn.configure(fg_color=ACCENT, text_color="white")
+            else:
+                btn.configure(fg_color="transparent", text_color="gray90")
 
-        # 投稿成功/失敗を通知
-        self._bridge.post_success.connect(self._notifier.notify_success)
-        self._bridge.post_failed.connect(self._notifier.notify_error)
-        self._bridge.story_success.connect(self._notifier.notify_success)
-        self._bridge.story_failed.connect(self._notifier.notify_error)
+        # タブ固有のリフレッシュ
+        tab = self._tabs[name]
+        if hasattr(tab, "on_show"):
+            tab.on_show()
 
-        # ランダム投稿の画像残数警告
-        self.random_post_tab.images_running_low.connect(self._on_images_low)
+    # ── イベント ──────────────────────────────────────
 
-    # ── スロット ─────────────────────────────────────
+    def _connect_events(self) -> None:
+        self.emitter.on("status_changed", self._set_status)
+        self.emitter.on("login_success", lambda: self._set_login_state(True))
+        self.emitter.on("login_failed", lambda: self._set_login_state(False))
+        self.emitter.on("notification", self._show_toast)
 
-    def _on_status_changed(self, message: str) -> None:
-        """ブリッジからのステータス変更を反映."""
-        self.status_bar.showMessage(message, 5000)
+    def _poll_events(self) -> None:
+        self.emitter.process_pending()
+        self.after(100, self._poll_events)
+
+    def _set_status(self, text: str) -> None:
+        self._statusbar.configure(text=text)
+
+    def _set_login_state(self, ok: bool) -> None:
+        if ok:
+            self._login_btn.configure(text="ログイン済み", fg_color="green")
+        else:
+            self._login_btn.configure(text="ログイン", fg_color=ACCENT)
 
     def _on_login(self) -> None:
-        """ログインボタンクリック."""
-        self._login_btn.setEnabled(False)
-        self._login_btn.setText("ログイン中…")
-        self._bridge.login()
+        self.bridge.login()
 
-    def _on_login_success(self) -> None:
-        """ログイン成功."""
-        self._login_btn.setText("ログイン済")
-        self._login_btn.setEnabled(False)
-        self.status_bar.showMessage(
-            f"{self._default_status} | ログイン済",
-        )
-        logger.info("ログイン成功")
+    # ── トースト通知 ──────────────────────────────────
 
-    def _on_login_failed(self) -> None:
-        """ログイン失敗."""
-        self._login_btn.setText("ログイン")
-        self._login_btn.setEnabled(True)
-        self.status_bar.showMessage("ログインに失敗しました", 5000)
-        logger.warning("ログイン失敗")
+    def _show_toast(self, title: str, message: str, level: str = "info") -> None:
+        colors = {"info": "#3b82f6", "warning": "#f59e0b", "error": "#ef4444"}
+        bg = colors.get(level, "#3b82f6")
 
-    def _on_job_scheduled(self, job) -> None:
-        """他タブからの予約ジョブを受け取る."""
-        job_id = self._connector.add_job(job)
-        self.schedule_tab.refresh_schedule()
-        self.calendar_tab.refresh()
-        logger.info(f"ジョブ予約: {job_id}")
+        toast = ctk.CTkFrame(self, fg_color=bg, corner_radius=10)
+        toast.place(relx=1.0, rely=0.0, anchor="ne", x=-20, y=20)
 
-    def _on_job_completed_notify(self, job_id: str) -> None:
-        """スケジュールジョブ完了時の通知."""
-        self._notifier.notify_schedule(f"ジョブ {job_id} が完了しました")
-        self.calendar_tab.refresh()
+        ctk.CTkLabel(
+            toast,
+            text=f"{title}\n{message}",
+            font=ctk.CTkFont(size=12),
+            text_color="white",
+            wraplength=280,
+            justify="left",
+        ).pack(padx=16, pady=10)
 
-    def _on_job_failed_notify(self, job_id: str, message: str) -> None:
-        """スケジュールジョブ失敗時の通知."""
-        self._notifier.notify_error(f"ジョブ {job_id} 失敗: {message}")
+        # 4秒後にフェードアウト
+        self.after(4000, toast.destroy)
 
-    def _on_images_low(self, dir_path: str, remaining: int, total: int) -> None:
-        """画像残数が少ない時の通知."""
-        from pathlib import Path
-        folder = Path(dir_path).name
-        self._notifier.notify_warning(
-            f"「{folder}」の未使用画像が残り {remaining} 枚です！\n"
-            f"(全{total}枚中)"
-        )
+    # ── 終了処理 ──────────────────────────────────────
 
-    def _quit_app(self) -> None:
-        """アプリケーションを終了する."""
-        # トレイアイコンを非表示にして完全に閉じる
-        if hasattr(self, "tray_icon"):
-            self.tray_icon.hide()
-        QApplication.quit()
-
-    def _on_tray_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
-        """トレイアイコンクリック."""
-        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
-            self.show()
-            self.activateWindow()
-
-    def closeEvent(self, event) -> None:
-        """ウィンドウを閉じる際の処理."""
-        # 設定を保存
+    def _on_close(self) -> None:
+        logger.info("アプリケーション終了")
         self.settings.save()
-
-        # トレイに最小化するか終了するか
-        if hasattr(self, "tray_icon") and self.tray_icon.isVisible():
-            self.hide()
-            self.tray_icon.showMessage(
-                "VRCPost Posting Tool",
-                "バックグラウンドで動作しています",
-                QSystemTrayIcon.MessageIcon.Information,
-                2000,
-            )
-            event.ignore()
-        else:
-            # リソース解放
-            self._notifier.cleanup()
-            self.log_tab.cleanup()
-            self._connector.stop()
-            self._bridge.shutdown()
-            logger.info("アプリケーション終了")
-            event.accept()
+        self.connector.stop()
+        self.bridge.shutdown()
+        self.destroy()
 
 
 def main() -> None:
     """アプリケーションエントリーポイント."""
     setup_logger()
-
-    app = QApplication(sys.argv)
-    app.setApplicationName("VRCPost Posting Tool")
-    app.setOrganizationName("Meta-Develop")
-
-    # ダークテーマ
-    app.setStyle("Fusion")
-
-    window = MainWindow()
-    window.show()
-
-    sys.exit(app.exec())
+    app = App()
+    app.mainloop()
 
 
 if __name__ == "__main__":
