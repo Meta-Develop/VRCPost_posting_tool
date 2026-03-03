@@ -1,0 +1,24 @@
+{
+  "base_url": "https://vrcpost.com",
+  "test_mode": true,
+  "test_server_url": "http://localhost:5000",
+  "browser": {
+    "headless": false,
+    "timeout_ms": 30000,
+    "user_data_dir": "config/browser_data",
+    "slow_mo": 100
+  },
+  "scheduler": {
+    "timezone": "Asia/Tokyo",
+    "max_retries": 3,
+    "retry_interval_sec": 60,
+    "jobs_file": "config/scheduled_jobs.json"
+  },
+  "post": {
+    "default_hashtags": [],
+    "max_images": 4,
+    "image_max_size_kb": 5120,
+    "image_max_width": 1920,
+    "image_max_height": 1920
+  }
+}
