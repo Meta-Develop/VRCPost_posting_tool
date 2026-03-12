@@ -1,6 +1,6 @@
-"""ログ設定.
+"""Log configuration.
 
-loguruを使って構造化ログを出力する。
+Structured log output using loguru.
 """
 
 from __future__ import annotations
@@ -14,17 +14,17 @@ LOG_DIR = Path(__file__).parent.parent.parent / "logs"
 
 
 def setup_logger(log_level: str = "DEBUG") -> None:
-    """ロガーを初期化.
+    """Initialize the logger.
 
     Args:
-        log_level: ログレベル (DEBUG, INFO, WARNING, ERROR)
+        log_level: Log level (DEBUG, INFO, WARNING, ERROR).
     """
     LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-    # デフォルトのハンドラを削除
+    # Remove default handler
     logger.remove()
 
-    # コンソール出力
+    # Console output
     logger.add(
         sys.stderr,
         level=log_level,
@@ -32,7 +32,7 @@ def setup_logger(log_level: str = "DEBUG") -> None:
         "<cyan>{name}</cyan>:<cyan>{function}</cyan> - <level>{message}</level>",
     )
 
-    # ファイル出力
+    # File output
     logger.add(
         LOG_DIR / "app.log",
         level="DEBUG",
@@ -42,7 +42,7 @@ def setup_logger(log_level: str = "DEBUG") -> None:
         encoding="utf-8",
     )
 
-    # エラー専用ログ
+    # Error-only log
     logger.add(
         LOG_DIR / "error.log",
         level="ERROR",
@@ -52,4 +52,4 @@ def setup_logger(log_level: str = "DEBUG") -> None:
         encoding="utf-8",
     )
 
-    logger.info("ロガーを初期化しました")
+    logger.info("Logger initialized")

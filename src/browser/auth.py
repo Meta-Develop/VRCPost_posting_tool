@@ -1,7 +1,7 @@
-"""認証・ログイン管理.
+"""Authentication and login management.
 
-VRCPostへのログインフローを自動化する。
-Google OAuth または メールアドレスでのログインに対応。
+Automate VRCPost login flows.
+Supports Google OAuth and email-based login.
 """
 
 from __future__ import annotations
@@ -13,28 +13,27 @@ from src.config.settings import AppSettings
 
 
 class AuthManager:
-    """VRCPost認証管理.
+    """VRCPost authentication manager.
 
-    ログイン状態の確認、ログインフローの実行を行う。
+    Checks login status and executes login flows.
     """
 
     def __init__(self, settings: AppSettings) -> None:
         self.settings = settings
 
     async def is_logged_in(self, page: Page) -> bool:
-        """ログイン状態をチェック.
+        """Check whether the user is logged in.
 
         Args:
-            page: Playwrightページ
+            page: Playwright page.
 
         Returns:
-            ログイン済みならTrue
+            True if already logged in.
         """
         base_url = self.settings.active_url
         await page.goto(f"{base_url}/home", wait_until="networkidle")
 
-        # ログインボタンが表示されているかで判定
-        # VRCPostでは未ログインだとサインインボタンが表示される
+        # Determine login state by checking for sign-in / guest indicators
         sign_in_button = page.locator("text=Sign in")
         guest_indicator = page.locator("text=Guest")
 
@@ -42,23 +41,23 @@ class AuthManager:
         has_sign_in = await sign_in_button.count() > 0
 
         if is_guest or has_sign_in:
-            logger.info("未ログイン状態")
+            logger.info("Not logged in")
             return False
 
-        logger.info("ログイン済み")
+        logger.info("Logged in")
         return True
 
     async def login_interactive(self, context: BrowserContext) -> bool:
-        """対話式ログイン.
+        """Interactive login.
 
-        ブラウザを表示してユーザーに手動でログインしてもらう。
-        ログイン完了を自動検出する。
+        Show the browser so the user can log in manually.
+        Login completion is detected automatically.
 
         Args:
-            context: ブラウザコンテキスト
+            context: Browser context.
 
         Returns:
-            ログイン成功ならTrue
+            True on successful login.
         """
         page = await context.new_page()
         base_url = self.settings.active_url
@@ -66,41 +65,41 @@ class AuthManager:
         try:
             await page.goto(f"{base_url}/home", wait_until="networkidle")
 
-            # 既にログイン済みならそのまま返す
+            # Already logged in — return immediately
             if await self.is_logged_in(page):
                 await page.close()
                 return True
 
-            logger.info("ログイン待機中... ブラウザでログインしてください")
+            logger.info("Waiting for login... please log in via the browser")
 
-            # ユーザーがログインするまで待機
-            # ログイン後、ホーム画面にリダイレクトされることを期待
-            # Guestテキストが消えたらログイン完了とみなす
+            # Wait until the user completes login
+            # Expect a redirect to the home screen after login
+            # Treat disappearance of 'Guest' text as login completion
             await page.wait_for_function(
                 """() => {
                     const body = document.body.innerText;
                     return !body.includes('Guest') && !body.includes('Sign in to join');
                 }""",
-                timeout=300000,  # 5分待機
+                timeout=300000,  # 5 min
             )
 
-            logger.info("ログイン成功を検出")
+            logger.info("Login success detected")
             await page.close()
             return True
 
         except Exception as e:
-            logger.error(f"ログイン中にエラー: {e}")
+            logger.error(f"Error during login: {e}")
             await page.close()
             return False
 
     async def ensure_logged_in(self, context: BrowserContext) -> bool:
-        """ログイン状態を確認し、必要ならログインフローを実行.
+        """Ensure the user is logged in, running the login flow if necessary.
 
         Args:
-            context: ブラウザコンテキスト
+            context: Browser context.
 
         Returns:
-            ログイン状態ならTrue
+            True if logged in.
         """
         page = await context.new_page()
         try:
@@ -111,5 +110,5 @@ class AuthManager:
             if not page.is_closed():
                 await page.close()
 
-        # ログインが必要
+        # Login required
         return await self.login_interactive(context)

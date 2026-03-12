@@ -1,1 +1,1 @@
-"""ブラウザ自動操作モジュール."""
+"""Browser automation module."""

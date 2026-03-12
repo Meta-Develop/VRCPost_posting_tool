@@ -1,6 +1,6 @@
-"""パッケージエントリーポイント.
+"""Package entry point.
 
-python -m src でアプリケーションを起動する。
+Launch the application with ``python -m src``.
 """
 
 from __future__ import annotations

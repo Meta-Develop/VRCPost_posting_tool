@@ -1,7 +1,7 @@
-"""セッション管理.
+"""Session management.
 
-Playwrightのブラウザコンテキストを管理し、
-認証状態の保持・復元を行う。
+Manage Playwright browser contexts and
+persist/restore authentication state.
 """
 
 from __future__ import annotations
@@ -22,10 +22,9 @@ SESSION_DIR = Path(__file__).parent.parent.parent / "config" / "browser_data"
 
 
 class SessionManager:
-    """ブラウザセッション管理.
+    """Browser session manager.
 
-    Playwrightのブラウザインスタンスとページの
-    ライフサイクルを管理する。
+    Manages the lifecycle of Playwright browser instances and pages.
     """
 
     def __init__(self, settings: AppSettings) -> None:
@@ -35,9 +34,9 @@ class SessionManager:
         self._storage_path = SESSION_DIR / "storage_state.json"
 
     async def start(self) -> BrowserContext:
-        """ブラウザコンテキストを起動.
+        """Start a browser context.
 
-        既存のセッション情報があれば復元する。
+        Restores existing session data if available.
 
         Returns:
             BrowserContext
@@ -53,7 +52,7 @@ class SessionManager:
 
         browser = await self._playwright.chromium.launch(**browser_args)
 
-        # セッション復元
+        # Session restore
         context_args: dict = {
             "viewport": {"width": 1280, "height": 800},
             "locale": "ja-JP",
@@ -62,20 +61,20 @@ class SessionManager:
 
         if self._storage_path.exists():
             context_args["storage_state"] = str(self._storage_path)
-            logger.info("既存のセッションを復元")
+            logger.info("Restoring existing session")
 
         self._context = await browser.new_context(**context_args)
-        logger.info("ブラウザコンテキストを起動")
+        logger.info("Browser context started")
         return self._context
 
     async def save_session(self) -> None:
-        """現在のセッション状態を保存."""
+        """Save the current session state."""
         if self._context:
             await self._context.storage_state(path=str(self._storage_path))
-            logger.info("セッションを保存")
+            logger.info("Session saved")
 
     async def close(self) -> None:
-        """ブラウザを終了."""
+        """Close the browser."""
         if self._context:
             await self.save_session()
             await self._context.close()
@@ -83,19 +82,19 @@ class SessionManager:
         if self._playwright:
             await self._playwright.stop()
             self._playwright = None
-        logger.info("ブラウザを終了")
+        logger.info("Browser closed")
 
     @property
     def context(self) -> Optional[BrowserContext]:
-        """現在のブラウザコンテキスト."""
+        """Current browser context."""
         return self._context
 
     def has_session(self) -> bool:
-        """保存済みセッションがあるか."""
+        """Check if a saved session exists."""
         return self._storage_path.exists()
 
     def clear_session(self) -> None:
-        """保存済みセッションを削除."""
+        """Delete the saved session."""
         if self._storage_path.exists():
             self._storage_path.unlink()
-            logger.info("セッションを削除")
+            logger.info("Session deleted")

@@ -1,6 +1,6 @@
-"""ジョブ定義.
+"""Job definitions.
 
-スケジュール投稿のジョブモデルを定義する。
+Defines models for scheduled posting jobs.
 """
 
 from __future__ import annotations
@@ -14,14 +14,14 @@ from pydantic import BaseModel, Field
 
 
 class JobType(str, Enum):
-    """ジョブの種類."""
+    """Job type."""
 
     POST = "post"
     STORY = "story"
 
 
 class JobStatus(str, Enum):
-    """ジョブの状態."""
+    """Job status."""
 
     PENDING = "pending"
     RUNNING = "running"
@@ -31,7 +31,7 @@ class JobStatus(str, Enum):
 
 
 class RepeatType(str, Enum):
-    """繰り返しの種類."""
+    """Repeat type."""
 
     NONE = "none"
     DAILY = "daily"
@@ -40,24 +40,24 @@ class RepeatType(str, Enum):
 
 
 class ScheduledJob(BaseModel):
-    """スケジュールジョブ.
+    """Scheduled job.
 
-    予約投稿やストーリー更新のスケジュールを表す。
+    Represents a scheduled post or story update.
     """
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
     job_type: JobType
     status: JobStatus = JobStatus.PENDING
 
-    # スケジュール
+    # Schedule
     scheduled_at: datetime
     repeat_type: RepeatType = RepeatType.NONE
 
-    # 投稿内容
+    # Post content
     text: str = ""
     image_paths: list[str] = Field(default_factory=list)
 
-    # メタデータ
+    # Metadata
     created_at: datetime = Field(default_factory=datetime.now)
     completed_at: Optional[datetime] = None
     error_message: Optional[str] = None
@@ -65,22 +65,22 @@ class ScheduledJob(BaseModel):
 
     @property
     def is_due(self) -> bool:
-        """実行予定時刻を過ぎているか."""
+        """Whether the scheduled time has passed."""
         return datetime.now() >= self.scheduled_at and self.status == JobStatus.PENDING
 
     @property
     def display_time(self) -> str:
-        """表示用の時刻文字列."""
+        """Formatted time for display."""
         return self.scheduled_at.strftime("%Y/%m/%d %H:%M")
 
     @property
     def display_status(self) -> str:
-        """表示用のステータス."""
+        """Localized status for display."""
         status_map = {
-            JobStatus.PENDING: "待機中",
-            JobStatus.RUNNING: "実行中",
-            JobStatus.COMPLETED: "完了",
-            JobStatus.FAILED: "失敗",
-            JobStatus.CANCELLED: "キャンセル",
+            JobStatus.PENDING: "Pending",
+            JobStatus.RUNNING: "Running",
+            JobStatus.COMPLETED: "Completed",
+            JobStatus.FAILED: "Failed",
+            JobStatus.CANCELLED: "Cancelled",
         }
         return status_map.get(self.status, str(self.status))

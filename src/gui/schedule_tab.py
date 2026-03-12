@@ -1,6 +1,6 @@
-"""スケジュールタブ (CustomTkinter).
+"""Schedule tab (CustomTkinter).
 
-登録済みジョブの一覧表示・キャンセル操作を提供する。
+Lists registered jobs and provides cancel operations.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ STATUS_COLORS = {
 
 
 class ScheduleTab(ctk.CTkFrame):
-    """スケジュールタブ."""
+    """Schedule tab."""
 
     def __init__(self, parent: ctk.CTkFrame, app: App) -> None:
         super().__init__(parent, fg_color="transparent")
@@ -32,17 +32,17 @@ class ScheduleTab(ctk.CTkFrame):
         self._build_ui()
 
     def _build_ui(self) -> None:
-        # ヘッダー
+        # Header
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", pady=(0, 8))
 
         ctk.CTkLabel(
-            header, text="スケジュール", font=ctk.CTkFont(size=22, weight="bold")
+            header, text="Schedule", font=ctk.CTkFont(size=22, weight="bold")
         ).pack(side="left")
 
         ctk.CTkButton(
             header,
-            text="更新",
+            text="Refresh",
             width=70,
             height=28,
             corner_radius=6,
@@ -54,11 +54,11 @@ class ScheduleTab(ctk.CTkFrame):
         )
         self._count_label.pack(side="right", padx=12)
 
-        # テーブルヘッダー
+        # Table header
         th = ctk.CTkFrame(self, corner_radius=0, height=30)
         th.pack(fill="x")
         th.pack_propagate(False)
-        cols = [("ID", 80), ("種類", 70), ("日時", 140), ("テキスト", 0), ("状態", 80)]
+        cols = [("ID", 80), ("Type", 70), ("Date/Time", 140), ("Text", 0), ("Status", 80)]
         for label, w in cols:
             kw: dict = {"text": label, "font": ctk.CTkFont(size=11, weight="bold")}
             if w:
@@ -69,22 +69,22 @@ class ScheduleTab(ctk.CTkFrame):
             else:
                 lbl.pack(side="left", expand=True, fill="x", padx=4)
 
-        # スクロール可能リスト
+        # Scrollable list
         self._scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
         self._scroll.pack(fill="both", expand=True, pady=(2, 0))
 
-    # ── リフレッシュ ──
+    # ── Refresh ──
 
     def _refresh(self) -> None:
         for w in self._scroll.winfo_children():
             w.destroy()
 
         jobs = self.app.connector.get_jobs()
-        self._count_label.configure(text=f"{len(jobs)} 件")
+        self._count_label.configure(text=f"{len(jobs)} jobs")
 
         if not jobs:
             ctk.CTkLabel(
-                self._scroll, text="ジョブなし", text_color="gray"
+                self._scroll, text="No jobs", text_color="gray"
             ).pack(pady=30)
             return
 
@@ -121,7 +121,7 @@ class ScheduleTab(ctk.CTkFrame):
             if job.status == JobStatus.PENDING:
                 ctk.CTkButton(
                     row,
-                    text="取消",
+                    text="Cancel",
                     width=44,
                     height=24,
                     corner_radius=4,
@@ -133,9 +133,9 @@ class ScheduleTab(ctk.CTkFrame):
 
     def _cancel_job(self, job_id: str) -> None:
         self.app.connector.remove_job(job_id)
-        self.app.notifier.info("キャンセル", f"ジョブ {job_id} をキャンセルしました")
+        self.app.notifier.info("Cancelled", f"Job {job_id} cancelled")
         self._refresh()
 
     def on_show(self) -> None:
-        """タブ表示時に自動更新."""
+        """Auto-refresh when the tab is shown."""
         self._refresh()

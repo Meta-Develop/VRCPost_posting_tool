@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VRCPost (テストサーバー)</title>
+    <title>VRCPost (Test Server)</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -20,7 +20,7 @@
             <nav class="header-nav">
                 {% if user %}
                     <span class="user-name">{{ user.name }}</span>
-                    <a href="/logout" class="btn btn-small">ログアウト</a>
+                    <a href="/logout" class="btn btn-small">Logout</a>
                 {% else %}
                     <span class="guest-label">Guest</span>
                 {% endif %}
@@ -29,13 +29,13 @@
     </header>
 
     <main class="main-content">
-        <!-- ストーリーエリア -->
+        <!-- Stories section -->
         <section class="stories-section">
             <div class="stories-container">
                 {% if user %}
                 <div class="story-add-button" onclick="document.getElementById('story-modal').style.display='flex'">
                     <div class="story-avatar add">+</div>
-                    <span>ストーリー</span>
+                    <span>Story</span>
                 </div>
                 {% endif %}
                 {% for story in stories %}
@@ -51,7 +51,7 @@
             </div>
         </section>
 
-        <!-- 投稿フォーム -->
+        <!-- Post form -->
         {% if user %}
         <section class="post-form-section">
             <form action="/post" method="POST" enctype="multipart/form-data" id="post-form">
@@ -59,38 +59,38 @@
                     <div class="post-avatar">{{ user.name[0] }}</div>
                     <span>{{ user.name }}</span>
                 </div>
-                <textarea name="text" placeholder="Share what you've been up to in VRChat… #hashtags @mentions supported" rows="3"></textarea>
+                <textarea name="text" placeholder="Share what you've been up to in VRChat... #hashtags @mentions supported" rows="3"></textarea>
                 <div class="post-form-media" id="image-preview-container"></div>
                 <div class="post-form-actions">
-                    <label class="btn btn-icon" title="画像を追加">
-                        📷
+                    <label class="btn btn-icon" title="Add Image">
+                        &#x1f4f7;
                         <input type="file" name="images" accept="image/*" multiple style="display:none" onchange="previewImages(this)">
                     </label>
                     <div class="schedule-section">
-                        <label class="btn btn-icon" title="予約投稿" onclick="toggleSchedule()">
-                            🕐
+                        <label class="btn btn-icon" title="Schedule Post" onclick="toggleSchedule()">
+                            &#x1f550;
                         </label>
                         <input type="datetime-local" name="scheduled_at" id="schedule-input" style="display:none">
                     </div>
-                    <button type="submit" class="btn btn-primary">Post<span class="shortcut">Ctrl⏎</span></button>
+                    <button type="submit" class="btn btn-primary">Post<span class="shortcut">Ctrl&#x23ce;</span></button>
                 </div>
             </form>
         </section>
         {% endif %}
 
-        <!-- タイムライン -->
+        <!-- Timeline -->
         <section class="timeline">
             {% for post in posts %}
             <article class="post-card">
                 <div class="post-header">
                     <div class="post-avatar">{{ post.user.name[0] }}</div>
                     <div class="post-meta">
-                        <span class="post-author">{{ post.user.name }}さんのプロフィール</span>
+                        <span class="post-author">{{ post.user.name }}'s Profile</span>
                         <span class="post-author-handle">{{ post.user.name }}</span>
                         <span class="post-username">@{{ post.user.username }}</span>
                         <span class="post-time">{{ post.created_at }}</span>
                     </div>
-                    <button class="btn-more" aria-label="more">⋯</button>
+                    <button class="btn-more" aria-label="more">&#x22ef;</button>
                 </div>
                 {% if post.images %}
                 <div class="post-images">
@@ -103,12 +103,12 @@
                 <div class="post-text">{{ post.text }}</div>
                 {% endif %}
                 {% if post.scheduled_at %}
-                <div class="post-scheduled">🕐 予約: {{ post.scheduled_at }}</div>
+                <div class="post-scheduled">&#x1f550; Scheduled: {{ post.scheduled_at }}</div>
                 {% endif %}
                 <div class="post-actions">
-                    <button class="btn-action">❤️ {{ post.likes }}</button>
-                    <button class="btn-action">💬</button>
-                    <button class="btn-action">🔖</button>
+                    <button class="btn-action">&#x2764;&#xfe0f; {{ post.likes }}</button>
+                    <button class="btn-action">&#x1f4ac;</button>
+                    <button class="btn-action">&#x1f516;</button>
                 </div>
             </article>
             {% else %}
@@ -124,36 +124,36 @@
             </div>
             {% else %}
             <div class="no-posts">
-                <p>まだ投稿はありません。最初の投稿をしてみましょう！</p>
+                <p>No posts yet. Share your first post!</p>
             </div>
             {% endif %}
             {% endfor %}
         </section>
     </main>
 
-    <!-- ストーリーモーダル -->
+    <!-- Story modal -->
     <div id="story-modal" class="modal" style="display:none">
         <div class="modal-content">
-            <h3>ストーリーを投稿</h3>
+            <h3>Post a Story</h3>
             <form action="/story" method="POST" enctype="multipart/form-data">
                 <div class="form-group">
-                    <label>画像を選択</label>
+                    <label>Select Image</label>
                     <input type="file" name="image" accept="image/*" required>
                 </div>
                 <div class="form-group">
-                    <label>テキスト（任意）</label>
-                    <input type="text" name="text" placeholder="ストーリーテキスト...">
+                    <label>Text (optional)</label>
+                    <input type="text" name="text" placeholder="Story text...">
                 </div>
                 <div class="modal-actions">
-                    <button type="button" class="btn" onclick="document.getElementById('story-modal').style.display='none'">キャンセル</button>
-                    <button type="submit" class="btn btn-primary">投稿</button>
+                    <button type="button" class="btn" onclick="document.getElementById('story-modal').style.display='none'">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Post</button>
                 </div>
             </form>
         </div>
     </div>
 
     <footer class="footer">
-        <p>&copy; 2026 VRCPost (テストサーバー)</p>
+        <p>&copy; 2026 VRCPost (Test Server)</p>
     </footer>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>

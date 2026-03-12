@@ -1,6 +1,6 @@
-"""ログタブ (CustomTkinter).
+"""Log tab (CustomTkinter).
 
-loguru のログをリアルタイムで表示する。
+Display loguru logs in real time.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from loguru import logger
 if TYPE_CHECKING:
     from src.gui.main_window import App
 
-# ログレベル → 色
+# Log level -> color
 LEVEL_COLORS = {
     "DEBUG": "#6b7280",
     "INFO": "#3b82f6",
@@ -24,7 +24,7 @@ LEVEL_COLORS = {
 
 
 class LogTab(ctk.CTkFrame):
-    """ログタブ."""
+    """Log tab."""
 
     def __init__(self, parent: ctk.CTkFrame, app: App) -> None:
         super().__init__(parent, fg_color="transparent")
@@ -35,20 +35,20 @@ class LogTab(ctk.CTkFrame):
         self._install_sink()
 
     def _build_ui(self) -> None:
-        # ヘッダー
+        # Header
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", pady=(0, 8))
 
         ctk.CTkLabel(
-            header, text="ログ", font=ctk.CTkFont(size=22, weight="bold")
+            header, text="Logs", font=ctk.CTkFont(size=22, weight="bold")
         ).pack(side="left")
 
         ctk.CTkButton(
-            header, text="クリア", width=60, height=28, corner_radius=6,
+            header, text="Clear", width=60, height=28, corner_radius=6,
             fg_color="gray40", command=self._clear,
         ).pack(side="right")
 
-        # フィルター
+        # Filter
         self._filter_var = ctk.StringVar(value="ALL")
         filter_frame = ctk.CTkFrame(header, fg_color="transparent")
         filter_frame.pack(side="right", padx=12)
@@ -63,7 +63,7 @@ class LogTab(ctk.CTkFrame):
                 command=self._apply_filter,
             ).pack(side="left", padx=4)
 
-        # ログ表示エリア
+        # Log display area
         self._textbox = ctk.CTkTextbox(
             self,
             corner_radius=8,
@@ -73,7 +73,7 @@ class LogTab(ctk.CTkFrame):
         )
         self._textbox.pack(fill="both", expand=True)
 
-    # ── loguru シンク ──
+    # ── loguru sink ──
 
     def _install_sink(self) -> None:
         logger.add(self._log_sink, format="{time:HH:mm:ss} | {level: <8} | {message}")
@@ -84,7 +84,7 @@ class LogTab(ctk.CTkFrame):
         formatted = str(message).rstrip("\n")
         self._all_logs.append((level, formatted))
 
-        # 最大保持行数
+        # Max retained lines
         if len(self._all_logs) > 5000:
             self._all_logs = self._all_logs[-3000:]
 
@@ -98,9 +98,9 @@ class LogTab(ctk.CTkFrame):
             self._textbox.see("end")
             self._textbox.configure(state="disabled")
         except Exception:
-            pass  # ウィジェット破棄後の書き込み防止
+            pass  # Prevent writes after widget destruction
 
-    # ── フィルター ──
+    # ── Filter ──
 
     def _apply_filter(self) -> None:
         self._current_filter = self._filter_var.get()
@@ -120,7 +120,7 @@ class LogTab(ctk.CTkFrame):
             except ValueError:
                 self._append_line(line)
 
-    # ── クリア ──
+    # ── Clear ──
 
     def _clear(self) -> None:
         self._all_logs.clear()

@@ -1,7 +1,7 @@
-"""スレッドセーフなイベントシステム.
+"""Thread-safe event system.
 
-GUIスレッドとバックグラウンドスレッド間の通信を
-キューベースで安全に行う。
+Queue-based communication between the GUI thread
+and background threads.
 """
 
 from __future__ import annotations
@@ -12,10 +12,10 @@ from typing import Any, Callable
 
 
 class EventEmitter:
-    """スレッドセーフなイベントエミッター.
+    """Thread-safe event emitter.
 
-    任意のスレッドから emit() でイベントをキューに投入し、
-    メインスレッドで process_pending() を呼んでハンドラを実行する。
+    Any thread can call emit() to enqueue events;
+    the main thread calls process_pending() to dispatch handlers.
     """
 
     def __init__(self) -> None:
@@ -24,23 +24,23 @@ class EventEmitter:
         self._lock = threading.Lock()
 
     def on(self, event: str, handler: Callable) -> None:
-        """イベントハンドラを登録."""
+        """Register an event handler."""
         with self._lock:
             self._handlers.setdefault(event, []).append(handler)
 
     def off(self, event: str, handler: Callable) -> None:
-        """イベントハンドラを解除."""
+        """Unregister an event handler."""
         with self._lock:
             handlers = self._handlers.get(event, [])
             if handler in handlers:
                 handlers.remove(handler)
 
     def emit(self, event: str, *args: Any) -> None:
-        """イベントをキューに投入 (スレッドセーフ)."""
+        """Enqueue an event (thread-safe)."""
         self._queue.put((event, args))
 
     def process_pending(self) -> None:
-        """キュー内の全イベントをディスパッチ (メインスレッドから呼ぶ)."""
+        """Dispatch all queued events (call from the main thread)."""
         while True:
             try:
                 event, args = self._queue.get_nowait()

@@ -1,7 +1,7 @@
-"""通知ユーティリティ.
+"""Notification utilities.
 
-アプリ内トースト通知を EventEmitter 経由で発行する。
-メインウィンドウ側でトースト UI を表示する。
+Emits in-app toast notifications via EventEmitter.
+The main window renders the toast UI.
 """
 
 from __future__ import annotations
@@ -15,24 +15,24 @@ if TYPE_CHECKING:
 
 
 class NotificationManager:
-    """通知マネージャ.
+    """Notification manager.
 
     Events:
         notification (str, str, str): (title, message, level)
-            level は "info" | "warning" | "error"
+            level is "info" | "warning" | "error"
     """
 
     def __init__(self, emitter: EventEmitter) -> None:
         self.emitter = emitter
 
     def info(self, title: str, message: str) -> None:
-        logger.info(f"[通知] {title}: {message}")
+        logger.info(f"[Notification] {title}: {message}")
         self.emitter.emit("notification", title, message, "info")
 
     def warning(self, title: str, message: str) -> None:
-        logger.warning(f"[通知] {title}: {message}")
+        logger.warning(f"[Notification] {title}: {message}")
         self.emitter.emit("notification", title, message, "warning")
 
     def error(self, title: str, message: str) -> None:
-        logger.error(f"[通知] {title}: {message}")
+        logger.error(f"[Notification] {title}: {message}")
         self.emitter.emit("notification", title, message, "error")

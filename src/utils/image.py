@@ -1,6 +1,6 @@
-"""画像処理ユーティリティ.
+"""Image processing utilities.
 
-投稿用画像のリサイズ、サムネイル生成等を行う。
+Resize, thumbnail generation, etc. for post images.
 """
 
 from __future__ import annotations
@@ -19,37 +19,38 @@ def resize_image(
     quality: int = 85,
     output_path: Optional[Path] = None,
 ) -> Path:
-    """画像をリサイズ.
+    """Resize an image.
 
-    アスペクト比を保持しながら指定サイズ以内に収める。
+    Fits the image within the specified dimensions while preserving
+    the aspect ratio.
 
     Args:
-        image_path: 元画像のパス
-        max_width: 最大幅
-        max_height: 最大高さ
-        quality: JPEG品質 (1-100)
-        output_path: 出力先パス（Noneの場合は上書き）
+        image_path: Path to the source image.
+        max_width: Maximum width.
+        max_height: Maximum height.
+        quality: JPEG quality (1-100).
+        output_path: Output path (None to overwrite).
 
     Returns:
-        保存先のパス
+        Path to the saved image.
     """
     img = Image.open(image_path)
     original_size = img.size
 
-    # リサイズ不要ならそのまま返す
+    # No resize needed
     if img.width <= max_width and img.height <= max_height:
         if output_path:
             img.save(output_path, quality=quality)
             return output_path
         return image_path
 
-    # アスペクト比を保ってリサイズ
+    # Resize preserving aspect ratio
     img.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
 
     save_path = output_path or image_path
     img.save(save_path, quality=quality)
 
-    logger.info(f"画像をリサイズ: {original_size} -> {img.size} ({save_path.name})")
+    logger.info(f"Image resized: {original_size} -> {img.size} ({save_path.name})")
     return save_path
 
 
@@ -58,15 +59,15 @@ def create_thumbnail(
     size: tuple[int, int] = (200, 200),
     output_path: Optional[Path] = None,
 ) -> Path:
-    """サムネイル画像を生成.
+    """Generate a thumbnail.
 
     Args:
-        image_path: 元画像のパス
-        size: サムネイルサイズ (width, height)
-        output_path: 出力先パス
+        image_path: Path to the source image.
+        size: Thumbnail size (width, height).
+        output_path: Output path.
 
     Returns:
-        サムネイルのパス
+        Path to the thumbnail.
     """
     img = Image.open(image_path)
     img.thumbnail(size, Image.Resampling.LANCZOS)
@@ -76,38 +77,38 @@ def create_thumbnail(
         output_path = image_path.parent / f"{stem}_thumb{image_path.suffix}"
 
     img.save(output_path)
-    logger.debug(f"サムネイル生成: {output_path.name}")
+    logger.debug(f"Thumbnail created: {output_path.name}")
     return output_path
 
 
 def validate_image(image_path: Path, max_size_kb: int = 5120) -> tuple[bool, str]:
-    """画像のバリデーション.
+    """Validate an image file.
 
     Args:
-        image_path: 画像パス
-        max_size_kb: 最大ファイルサイズ(KB)
+        image_path: Image path.
+        max_size_kb: Max file size in KB.
 
     Returns:
-        (valid, message) のタプル
+        (valid, message) tuple.
     """
     if not image_path.exists():
-        return False, f"ファイルが存在しません: {image_path}"
+        return False, f"File not found: {image_path}"
 
-    # サイズチェック
+    # Size check
     file_size_kb = image_path.stat().st_size / 1024
     if file_size_kb > max_size_kb:
-        return False, f"ファイルサイズが大きすぎます: {file_size_kb:.0f}KB (上限: {max_size_kb}KB)"
+        return False, f"File too large: {file_size_kb:.0f}KB (limit: {max_size_kb}KB)"
 
-    # 画像として開けるかチェック
+    # Check if it can be opened as an image
     try:
         img = Image.open(image_path)
         img.verify()
     except Exception as e:
-        return False, f"画像ファイルが不正です: {e}"
+        return False, f"Invalid image file: {e}"
 
-    # 対応フォーマットチェック
+    # Format check
     suffix = image_path.suffix.lower()
     if suffix not in {".jpg", ".jpeg", ".png", ".gif", ".webp"}:
-        return False, f"未対応のフォーマットです: {suffix}"
+        return False, f"Unsupported format: {suffix}"
 
     return True, "OK"
