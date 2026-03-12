@@ -1,6 +1,6 @@
-"""ストーリー操作.
+"""Story operations.
 
-VRCPostのストーリー機能を自動化する。
+Automate VRCPost story features.
 """
 
 from __future__ import annotations
@@ -15,9 +15,9 @@ from src.config.settings import AppSettings
 
 
 class StoryManager:
-    """ストーリー操作管理.
+    """Story operation manager.
 
-    ストーリーのアップロード・更新を行う。
+    Handles story uploads and updates.
     """
 
     def __init__(self, settings: AppSettings) -> None:
@@ -29,15 +29,15 @@ class StoryManager:
         image_path: Path,
         text: Optional[str] = None,
     ) -> bool:
-        """ストーリーをアップロード.
+        """Upload a story.
 
         Args:
-            context: ブラウザコンテキスト
-            image_path: ストーリー画像のパス
-            text: ストーリーテキスト（任意）
+            context: Browser context.
+            image_path: Path to the story image.
+            text: Story text (optional).
 
         Returns:
-            アップロード成功ならTrue
+            True on success.
         """
         page = await context.new_page()
         base_url = self.settings.active_url
@@ -45,9 +45,9 @@ class StoryManager:
         try:
             await page.goto(f"{base_url}/home", wait_until="networkidle")
 
-            # ストーリー追加ボタンを探す
+            # Find the add-story button
             story_add_button = page.locator(
-                "button:has-text('ストーリー'), "
+                "button:has-text('Story'), "
                 "button:has-text('Story'), "
                 "[data-testid='add-story'], "
                 ".story-add-button"
@@ -55,53 +55,53 @@ class StoryManager:
             await story_add_button.click()
             await page.wait_for_timeout(500)
 
-            # モーダル/ダイアログ内に限定してセレクタを探す
+            # Scope selectors to the modal/dialog
             modal = page.locator(
                 "#story-modal, .modal:visible, "
                 "[role='dialog']:visible"
             ).first
 
-            # 画像アップロード（モーダル内のfile input）
+            # Image upload (file input inside the modal)
             file_input = modal.locator("input[type='file']").first
             await file_input.set_input_files(str(image_path))
             await page.wait_for_timeout(1500)
-            logger.debug(f"ストーリー画像アップロード: {image_path.name}")
+            logger.debug(f"Story image uploaded: {image_path.name}")
 
-            # テキスト入力（あれば）
+            # Text input (if provided)
             if text:
                 text_input = modal.locator(
                     "input[type='text'], textarea"
                 ).first
                 await text_input.fill(text)
 
-            # 投稿ボタン（モーダル内）
+            # Submit button (inside the modal)
             submit_button = modal.locator(
                 "button[type='submit'], "
-                "button:has-text('投稿'), "
+                "button:has-text('Post'), "
                 "button:has-text('Post'), "
                 "button:has-text('Share')"
             ).first
             await submit_button.click()
 
             await page.wait_for_timeout(2000)
-            logger.info(f"ストーリーアップロード完了: {image_path.name}")
+            logger.info(f"Story upload complete: {image_path.name}")
             return True
 
         except Exception as e:
-            logger.error(f"ストーリーアップロードに失敗: {e}")
+            logger.error(f"Story upload failed: {e}")
             return False
 
         finally:
             await page.close()
 
     async def get_current_stories(self, context: BrowserContext) -> list[dict]:
-        """現在のストーリー一覧を取得.
+        """Get the list of current stories.
 
         Args:
-            context: ブラウザコンテキスト
+            context: Browser context.
 
         Returns:
-            ストーリー情報のリスト
+            List of story information dicts.
         """
         page = await context.new_page()
         base_url = self.settings.active_url
@@ -109,7 +109,7 @@ class StoryManager:
         try:
             await page.goto(f"{base_url}/home", wait_until="networkidle")
 
-            # ストーリーエリアの情報を取得
+            # Get story area information
             stories = []
             story_elements = page.locator(".story-item, [data-testid='story']")
             count = await story_elements.count()
@@ -122,11 +122,11 @@ class StoryManager:
                 }
                 stories.append(story_info)
 
-            logger.debug(f"ストーリー {len(stories)}件 取得")
+            logger.debug(f"Retrieved {len(stories)} stories")
             return stories
 
         except Exception as e:
-            logger.error(f"ストーリー一覧の取得に失敗: {e}")
+            logger.error(f"Failed to get story list: {e}")
             return []
 
         finally:

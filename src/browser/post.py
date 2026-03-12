@@ -1,7 +1,7 @@
-"""投稿操作.
+"""Post operations.
 
-VRCPostへのテキスト・画像投稿を自動化する。
-予約投稿機能にも対応。
+Automate text and image posting on VRCPost.
+Supports scheduled posting.
 """
 
 from __future__ import annotations
@@ -17,9 +17,9 @@ from src.config.settings import AppSettings
 
 
 class PostManager:
-    """投稿操作管理.
+    """Post operation manager.
 
-    テキスト投稿、画像付き投稿、予約投稿を行う。
+    Handles text posts, image-attached posts, and scheduled posts.
     """
 
     def __init__(self, settings: AppSettings) -> None:
@@ -32,16 +32,16 @@ class PostManager:
         image_paths: Optional[list[Path]] = None,
         scheduled_at: Optional[datetime] = None,
     ) -> bool:
-        """投稿を作成.
+        """Create a post.
 
         Args:
-            context: ブラウザコンテキスト
-            text: 投稿テキスト
-            image_paths: 添付画像パスのリスト
-            scheduled_at: 予約投稿日時（Noneなら即時投稿）
+            context: Browser context.
+            text: Post text.
+            image_paths: List of image file paths to attach.
+            scheduled_at: Scheduled post time (None for immediate).
 
         Returns:
-            投稿成功ならTrue
+            True on success.
         """
         page = await context.new_page()
         base_url = self.settings.active_url
@@ -49,92 +49,92 @@ class PostManager:
         try:
             await page.goto(f"{base_url}/home", wait_until="networkidle")
 
-            # テキスト入力エリアを探してクリック
+            # Find and click the text input area
             text_area = page.locator("textarea, [contenteditable='true'], [role='textbox']").first
             await text_area.click()
             await text_area.fill(text)
-            logger.debug(f"テキスト入力: {text[:50]}...")
+            logger.debug(f"Text entered: {text[:50]}...")
 
-            # 画像アップロード
+            # Upload images
             if image_paths:
                 for img_path in image_paths:
                     await self._upload_image(page, img_path)
 
-            # 予約投稿の設定
+            # Set scheduled post time
             if scheduled_at:
                 await self._set_schedule(page, scheduled_at)
 
-            # 投稿ボタンをクリック
+            # Click the post button
             post_button = page.locator(
-                "button:has-text('Post'), button:has-text('投稿'), "
+                "button:has-text('Post'), button:has-text('Post'), "
                 "button[type='submit']:has-text('Post')"
             ).first
             await post_button.click()
 
-            # 投稿完了を待つ
+            # Wait for post completion
             await page.wait_for_timeout(2000)
 
             logger.info(
-                f"投稿{'予約' if scheduled_at else ''}完了: {text[:30]}..."
+                f"Post{' scheduled' if scheduled_at else ''} complete: {text[:30]}..."
             )
             return True
 
         except Exception as e:
-            logger.error(f"投稿に失敗: {e}")
+            logger.error(f"Post failed: {e}")
             return False
 
         finally:
             await page.close()
 
     async def _upload_image(self, page: Page, image_path: Path) -> None:
-        """画像をアップロード.
+        """Upload an image.
 
         Args:
-            page: Playwrightページ
-            image_path: アップロードする画像のパス
+            page: Playwright page.
+            image_path: Path to the image file to upload.
         """
-        # ファイル入力要素を探す
+        # Find the file input element
         file_input = page.locator("input[type='file']").first
 
-        # 非表示でも操作できるようにset_input_filesを使用
+        # Use set_input_files to work even with hidden inputs
         await file_input.set_input_files(str(image_path))
 
-        # アップロード完了を待つ
+        # Wait for upload to complete
         await page.wait_for_timeout(1000)
-        logger.debug(f"画像アップロード: {image_path.name}")
+        logger.debug(f"Image uploaded: {image_path.name}")
 
     async def _set_schedule(self, page: Page, scheduled_at: datetime) -> None:
-        """予約投稿日時を設定.
+        """Set the scheduled post date/time.
 
-        VRCPostの予約投稿UIを操作して日時を設定する。
+        Operates VRCPost's schedule UI to set the date and time.
 
         Args:
-            page: Playwrightページ
-            scheduled_at: 予約日時
+            page: Playwright page.
+            scheduled_at: Scheduled date/time.
         """
-        # 予約投稿ボタン/オプションを探してクリック
+        # Find and click the schedule button/option
         schedule_button = page.locator(
-            "button:has-text('予約'), button:has-text('Schedule'), "
+            "button:has-text('Schedule'), button:has-text('Schedule'), "
             "[data-testid='schedule-button']"
         ).first
         await schedule_button.click()
         await page.wait_for_timeout(500)
 
-        # 日時入力
+        # Date/time input
         date_input = page.locator("input[type='date'], input[type='datetime-local']").first
         await date_input.fill(scheduled_at.strftime("%Y-%m-%dT%H:%M"))
 
-        logger.debug(f"予約日時設定: {scheduled_at.isoformat()}")
+        logger.debug(f"Schedule set: {scheduled_at.isoformat()}")
 
     async def delete_post(self, context: BrowserContext, post_id: str) -> bool:
-        """投稿を削除.
+        """Delete a post.
 
         Args:
-            context: ブラウザコンテキスト
-            post_id: 削除対象の投稿ID
+            context: Browser context.
+            post_id: ID of the post to delete.
 
         Returns:
-            削除成功ならTrue
+            True on success.
         """
         page = await context.new_page()
         base_url = self.settings.active_url
@@ -142,28 +142,28 @@ class PostManager:
         try:
             await page.goto(f"{base_url}/post/{post_id}", wait_until="networkidle")
 
-            # 削除メニューを開く
+            # Open the more menu
             menu_button = page.locator("[aria-label='more'], button:has-text('...')").first
             await menu_button.click()
 
-            # 削除ボタンをクリック
+            # Click delete
             delete_button = page.locator(
-                "button:has-text('削除'), button:has-text('Delete')"
+                "button:has-text('Delete'), button:has-text('Delete')"
             ).first
             await delete_button.click()
 
-            # 確認ダイアログ
+            # Confirm dialog
             confirm_button = page.locator(
-                "button:has-text('確認'), button:has-text('OK'), button:has-text('Confirm')"
+                "button:has-text('OK'), button:has-text('Confirm')"
             ).first
             await confirm_button.click()
 
             await page.wait_for_timeout(1000)
-            logger.info(f"投稿削除: {post_id}")
+            logger.info(f"Post deleted: {post_id}")
             return True
 
         except Exception as e:
-            logger.error(f"投稿削除に失敗: {e}")
+            logger.error(f"Post deletion failed: {e}")
             return False
 
         finally:
