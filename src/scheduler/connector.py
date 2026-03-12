@@ -1,6 +1,6 @@
-"""スケジューラー ↔ ブラウザ接続.
+"""Scheduler-browser connector.
 
-SchedulerEngine からのジョブ実行を BrowserBridge に中継する。
+Relays job execution from SchedulerEngine to BrowserBridge.
 """
 
 from __future__ import annotations
@@ -18,15 +18,15 @@ if TYPE_CHECKING:
 
 
 class SchedulerConnector:
-    """スケジューラーとブラウザの接続.
+    """Connector between the scheduler and browser.
 
-    SchedulerEngine のコールバックとして登録し、
-    ジョブ内容に応じて BrowserBridge を呼び出す。
+    Registered as a callback on SchedulerEngine and
+    invokes BrowserBridge according to job type.
 
     Events:
-        job_started   (str)       : ジョブ実行開始
-        job_completed (str)       : ジョブ実行完了
-        job_failed    (str, str)  : ジョブ実行失敗 (id, error)
+        job_started   (str)       : Job execution started
+        job_completed (str)       : Job execution completed
+        job_failed    (str, str)  : Job execution failed (id, error)
     """
 
     def __init__(
@@ -39,17 +39,17 @@ class SchedulerConnector:
         self._worker = worker
         self.emitter = emitter
 
-        # エンジンにコールバック登録
+        # Register callback on the engine
         self._engine.set_callback(self._execute_job)
 
-    # ── パブリック ──
+    # ── Public ──
 
     def start(self) -> None:
-        """スケジューラーを開始."""
+        """Start the scheduler."""
         self._engine.start()
 
     def stop(self) -> None:
-        """スケジューラーを停止."""
+        """Stop the scheduler."""
         self._engine.stop()
 
     def add_job(self, job: ScheduledJob) -> str:
@@ -61,12 +61,12 @@ class SchedulerConnector:
     def get_jobs(self) -> list[ScheduledJob]:
         return self._engine.get_jobs()
 
-    # ── 内部 ──
+    # ── Internal ──
 
     def _execute_job(self, job: ScheduledJob) -> None:
-        """ジョブを実行 (APScheduler スレッドプールから呼ばれる)."""
+        """Execute a job (called from APScheduler thread pool)."""
         self.emitter.emit("job_started", job.id)
-        logger.info(f"ジョブ実行: {job.id} ({job.job_type.value})")
+        logger.info(f"Job executing: {job.id} ({job.job_type.value})")
 
         try:
             if job.job_type == JobType.POST:
@@ -76,7 +76,7 @@ class SchedulerConnector:
             self.emitter.emit("job_completed", job.id)
         except Exception as exc:
             msg = str(exc)
-            logger.error(f"ジョブ失敗 {job.id}: {msg}")
+            logger.error(f"Job failed {job.id}: {msg}")
             self.emitter.emit("job_failed", job.id, msg)
             raise
 
@@ -86,7 +86,7 @@ class SchedulerConnector:
 
     def _execute_story(self, job: ScheduledJob) -> None:
         if not job.image_paths:
-            raise ValueError("ストーリーには画像が必要です")
+            raise ValueError("Stories require an image")
         self._worker.upload_story(
             image_path=job.image_paths[0],
             text=job.text or None,

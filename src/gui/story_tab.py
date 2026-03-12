@@ -1,6 +1,6 @@
-"""ストーリータブ (CustomTkinter).
+"""Story tab (CustomTkinter).
 
-ストーリー画像アップロードの UI を提供する。
+Provides a UI for story image uploads.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ PREVIEW_SIZE = (200, 200)
 
 
 class StoryTab(ctk.CTkFrame):
-    """ストーリータブ."""
+    """Story tab."""
 
     def __init__(self, parent: ctk.CTkFrame, app: App) -> None:
         super().__init__(parent, fg_color="transparent")
@@ -30,44 +30,44 @@ class StoryTab(ctk.CTkFrame):
 
     def _build_ui(self) -> None:
         ctk.CTkLabel(
-            self, text="ストーリー", font=ctk.CTkFont(size=22, weight="bold")
+            self, text="Story", font=ctk.CTkFont(size=22, weight="bold")
         ).pack(anchor="w", pady=(0, 12))
 
-        # 画像選択
+        # Image selection
         sel_frame = ctk.CTkFrame(self, fg_color="transparent")
         sel_frame.pack(fill="x")
         ctk.CTkButton(
             sel_frame,
-            text="画像を選択",
+            text="Select Image",
             width=120,
             height=32,
             corner_radius=6,
             command=self._select_image,
         ).pack(side="left")
         self._path_label = ctk.CTkLabel(
-            sel_frame, text="未選択", text_color="gray", font=ctk.CTkFont(size=12)
+            sel_frame, text="Not selected", text_color="gray", font=ctk.CTkFont(size=12)
         )
         self._path_label.pack(side="left", padx=12)
 
-        # プレビュー
+        # Preview
         self._preview_frame = ctk.CTkFrame(self, height=220, corner_radius=8)
         self._preview_frame.pack(fill="x", pady=(8, 12))
         self._preview_label = ctk.CTkLabel(
-            self._preview_frame, text="画像なし", text_color="gray"
+            self._preview_frame, text="No image", text_color="gray"
         )
         self._preview_label.pack(expand=True, pady=20)
 
-        # テキスト
-        ctk.CTkLabel(self, text="テキスト（任意）", font=ctk.CTkFont(size=13)).pack(
+        # Text
+        ctk.CTkLabel(self, text="Text (optional)", font=ctk.CTkFont(size=13)).pack(
             anchor="w"
         )
         self._text = ctk.CTkTextbox(self, height=80, corner_radius=8)
         self._text.pack(fill="x", pady=(4, 12))
 
-        # アップロードボタン
+        # Upload button
         ctk.CTkButton(
             self,
-            text="ストーリーをアップロード",
+            text="Upload Story",
             height=40,
             corner_radius=8,
             fg_color="#6366f1",
@@ -78,8 +78,8 @@ class StoryTab(ctk.CTkFrame):
 
     def _select_image(self) -> None:
         path = filedialog.askopenfilename(
-            title="ストーリー画像を選択",
-            filetypes=[("画像", "*.jpg *.jpeg *.png *.gif *.webp *.bmp")],
+            title="Select Story Image",
+            filetypes=[("Images", "*.jpg *.jpeg *.png *.gif *.webp *.bmp")],
         )
         if not path:
             return
@@ -100,12 +100,12 @@ class StoryTab(ctk.CTkFrame):
                 expand=True, pady=8
             )
         except Exception as exc:
-            logger.warning(f"プレビュー失敗: {exc}")
+            logger.warning(f"Preview failed: {exc}")
 
     def _do_upload(self) -> None:
         if not self._image_path:
-            self.app.notifier.warning("入力エラー", "画像を選択してください")
+            self.app.notifier.warning("Input Error", "Please select an image")
             return
         text = self._text.get("1.0", "end").strip() or None
         self.app.bridge.upload_story(str(self._image_path), text)
-        self.app.notifier.info("ストーリー", "アップロードを送信しました")
+        self.app.notifier.info("Story", "Upload submitted")

@@ -1,6 +1,6 @@
-"""スケジューラーエンジン.
+"""Scheduler engine.
 
-APSchedulerを使ってジョブの実行スケジュールを管理する。
+Uses APScheduler to manage job execution schedules.
 """
 
 from __future__ import annotations
@@ -20,9 +20,9 @@ from src.scheduler.jobs import JobStatus, RepeatType, ScheduledJob
 
 
 class SchedulerEngine:
-    """スケジューラーエンジン.
+    """Scheduler engine.
 
-    ジョブの登録・実行・永続化を管理する。
+    Manages job registration, execution, and persistence.
     """
 
     def __init__(self, settings: AppSettings) -> None:
@@ -33,38 +33,38 @@ class SchedulerEngine:
         self._jobs_file = Path(settings.scheduler.jobs_file)
 
     def set_callback(self, callback: Callable) -> None:
-        """ジョブ実行時のコールバックを設定.
+        """Set the callback invoked when a job runs.
 
         Args:
-            callback: ジョブを受け取って実行する非同期関数
+            callback: Function that receives a job and executes it.
         """
         self._job_callback = callback
 
     def start(self) -> None:
-        """スケジューラーを開始."""
+        """Start the scheduler."""
         self._load_jobs()
         self._scheduler.start()
-        logger.info(f"スケジューラー開始 (ジョブ数: {len(self._jobs)})")
+        logger.info(f"Scheduler started ({len(self._jobs)} jobs)")
 
     def stop(self) -> None:
-        """スケジューラーを停止."""
+        """Stop the scheduler."""
         self._save_jobs()
         if self._scheduler.running:
             self._scheduler.shutdown()
-        logger.info("スケジューラー停止")
+        logger.info("Scheduler stopped")
 
     def add_job(self, job: ScheduledJob) -> str:
-        """ジョブを追加.
+        """Add a job.
 
         Args:
-            job: 追加するジョブ
+            job: The job to add.
 
         Returns:
-            ジョブID
+            Job ID.
         """
         self._jobs[job.id] = job
 
-        # APSchedulerにジョブを登録
+        # Register with APScheduler
         if job.repeat_type == RepeatType.NONE:
             trigger = DateTrigger(run_date=job.scheduled_at)
         elif job.repeat_type == RepeatType.DAILY:
@@ -96,17 +96,17 @@ class SchedulerEngine:
         )
 
         self._save_jobs()
-        logger.info(f"ジョブ追加: {job.id} ({job.job_type.value}) @ {job.display_time}")
+        logger.info(f"Job added: {job.id} ({job.job_type.value}) @ {job.display_time}")
         return job.id
 
     def remove_job(self, job_id: str) -> bool:
-        """ジョブを削除.
+        """Remove a job.
 
         Args:
-            job_id: 削除するジョブのID
+            job_id: ID of the job to remove.
 
         Returns:
-            削除成功ならTrue
+            True on success.
         """
         if job_id not in self._jobs:
             return False
@@ -119,54 +119,54 @@ class SchedulerEngine:
         job = self._jobs.pop(job_id)
         job.status = JobStatus.CANCELLED
         self._save_jobs()
-        logger.info(f"ジョブ削除: {job_id}")
+        logger.info(f"Job removed: {job_id}")
         return True
 
     def get_jobs(self) -> list[ScheduledJob]:
-        """全ジョブを取得.
+        """Get all jobs.
 
         Returns:
-            ジョブのリスト
+            List of jobs.
         """
         return list(self._jobs.values())
 
     def get_job(self, job_id: str) -> Optional[ScheduledJob]:
-        """ジョブを取得.
+        """Get a job by ID.
 
         Args:
-            job_id: ジョブID
+            job_id: Job ID.
 
         Returns:
-            ジョブ（存在しない場合None）
+            The job, or None if not found.
         """
         return self._jobs.get(job_id)
 
     def _execute_job(self, job_id: str) -> None:
-        """ジョブを実行.
+        """Execute a job.
 
         Args:
-            job_id: 実行するジョブのID
+            job_id: ID of the job to execute.
         """
         job = self._jobs.get(job_id)
         if not job:
-            logger.warning(f"ジョブが見つかりません: {job_id}")
+            logger.warning(f"Job not found: {job_id}")
             return
 
         job.status = JobStatus.RUNNING
-        logger.info(f"ジョブ実行開始: {job_id} ({job.job_type.value})")
+        logger.info(f"Job started: {job_id} ({job.job_type.value})")
 
         try:
             if self._job_callback:
                 self._job_callback(job)
             job.status = JobStatus.COMPLETED
             job.completed_at = datetime.now()
-            logger.info(f"ジョブ実行完了: {job_id}")
+            logger.info(f"Job completed: {job_id}")
 
         except Exception as e:
             job.retry_count += 1
             if job.retry_count < self.settings.scheduler.max_retries:
                 job.status = JobStatus.PENDING
-                # リトライスケジュール
+                # Schedule retry
                 retry_time = datetime.now() + timedelta(
                     seconds=self.settings.scheduler.retry_interval_sec
                 )
@@ -177,25 +177,25 @@ class SchedulerEngine:
                     args=[job_id],
                 )
                 logger.warning(
-                    f"ジョブ {job_id} 失敗 (リトライ {job.retry_count}/"
+                    f"Job {job_id} failed (retry {job.retry_count}/"
                     f"{self.settings.scheduler.max_retries}): {e}"
                 )
             else:
                 job.status = JobStatus.FAILED
                 job.error_message = str(e)
-                logger.error(f"ジョブ {job_id} 最終失敗: {e}")
+                logger.error(f"Job {job_id} final failure: {e}")
 
         self._save_jobs()
 
     def _save_jobs(self) -> None:
-        """ジョブ一覧をファイルに保存."""
+        """Save job list to file."""
         self._jobs_file.parent.mkdir(parents=True, exist_ok=True)
         data = {jid: job.model_dump(mode="json") for jid, job in self._jobs.items()}
         with open(self._jobs_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False, default=str)
 
     def _load_jobs(self) -> None:
-        """ファイルからジョブ一覧を復元."""
+        """Restore job list from file."""
         if not self._jobs_file.exists():
             return
 
@@ -205,9 +205,9 @@ class SchedulerEngine:
             for jid, job_data in data.items():
                 job = ScheduledJob(**job_data)
                 if job.status in (JobStatus.PENDING, JobStatus.RUNNING):
-                    # 未完了ジョブを再登録
+                    # Re-register incomplete jobs
                     job.status = JobStatus.PENDING
                     self._jobs[jid] = job
-            logger.info(f"ジョブ {len(self._jobs)}件 を復元")
+            logger.info(f"Restored {len(self._jobs)} jobs")
         except Exception as e:
-            logger.error(f"ジョブの復元に失敗: {e}")
+            logger.error(f"Failed to restore jobs: {e}")

@@ -1,1 +1,1 @@
-"""GUIウィジェットモジュール."""
+"""GUI widget module."""

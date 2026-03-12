@@ -1,1 +1,1 @@
-"""設定管理モジュール."""
+"""Configuration management module."""

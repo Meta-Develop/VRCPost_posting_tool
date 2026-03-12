@@ -1,7 +1,7 @@
-"""VRCPostモックサーバー.
+"""VRCPost mock server.
 
-VRCPostのUIと動作を模倣するFlaskアプリ。
-開発・テスト用にローカルで動作する。
+A Flask application that mimics the VRCPost UI and behavior
+for local development and testing.
 """
 
 from __future__ import annotations
@@ -29,11 +29,11 @@ app = Flask(
 )
 app.secret_key = "test-server-secret-key-for-development"
 
-# アップロードされた画像の保存先
+# Upload destination for images
 UPLOAD_DIR = Path(__file__).parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-# インメモリデータストア
+# In-memory data store
 posts_db: list[dict] = []
 stories_db: list[dict] = []
 scheduled_posts_db: list[dict] = []
@@ -41,7 +41,7 @@ users_db: dict[str, dict] = {
     "test@example.com": {
         "id": "test-user-001",
         "email": "test@example.com",
-        "name": "テストユーザー",
+        "name": "Test User",
         "username": "test_user",
         "avatar": None,
     }
@@ -50,13 +50,13 @@ users_db: dict[str, dict] = {
 
 @app.route("/")
 def index():
-    """ルート → ホームにリダイレクト."""
+    """Root -> redirect to home."""
     return redirect(url_for("home"))
 
 
 @app.route("/home")
 def home():
-    """ホーム画面（タイムライン）."""
+    """Home page (timeline)."""
     user = session.get("user")
     return render_template(
         "home.html",
@@ -68,10 +68,10 @@ def home():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    """ログイン画面."""
+    """Login page."""
     if request.method == "POST":
         email = request.form.get("email", "")
-        # テスト用: どのメールでもログイン可能
+        # For testing: any email can log in
         if email:
             if email not in users_db:
                 users_db[email] = {
@@ -88,7 +88,7 @@ def login():
 
 @app.route("/login/google")
 def login_google():
-    """Google OAuth模倣（テスト用: 自動ログイン）."""
+    """Google OAuth mock (auto-login for testing)."""
     email = "google_user@example.com"
     if email not in users_db:
         users_db[email] = {
@@ -104,14 +104,14 @@ def login_google():
 
 @app.route("/logout")
 def logout():
-    """ログアウト."""
+    """Logout."""
     session.pop("user", None)
     return redirect(url_for("home"))
 
 
 @app.route("/post", methods=["POST"])
 def create_post():
-    """投稿を作成."""
+    """Create a post."""
     user = session.get("user")
     if not user:
         return jsonify({"error": "Not logged in"}), 401
@@ -119,7 +119,7 @@ def create_post():
     text = request.form.get("text", "")
     scheduled_at = request.form.get("scheduled_at", "")
 
-    # 画像アップロード
+    # Image upload
     image_urls = []
     files = request.files.getlist("images")
     for f in files:
@@ -152,14 +152,14 @@ def create_post():
 
 @app.route("/story", methods=["POST"])
 def create_story():
-    """ストーリーを作成."""
+    """Create a story."""
     user = session.get("user")
     if not user:
         return jsonify({"error": "Not logged in"}), 401
 
     text = request.form.get("text", "")
 
-    # 画像アップロード
+    # Image upload
     image_url = None
     f = request.files.get("image")
     if f and f.filename:
@@ -185,31 +185,31 @@ def create_story():
 
 @app.route("/uploads/<filename>")
 def uploaded_file(filename):
-    """アップロードされたファイルを配信."""
+    """Serve uploaded files."""
     return send_from_directory(str(UPLOAD_DIR), filename)
 
 
 @app.route("/api/posts")
 def api_posts():
-    """投稿一覧API（テスト用）."""
+    """Posts list API (for testing)."""
     return jsonify({"posts": posts_db})
 
 
 @app.route("/api/stories")
 def api_stories():
-    """ストーリー一覧API（テスト用）."""
+    """Stories list API (for testing)."""
     return jsonify({"stories": stories_db})
 
 
 @app.route("/api/scheduled")
 def api_scheduled():
-    """予約投稿一覧API（テスト用）."""
+    """Scheduled posts list API (for testing)."""
     return jsonify({"scheduled": scheduled_posts_db})
 
 
 @app.route("/search")
 def search():
-    """検索画面."""
+    """Search page."""
     q = request.args.get("q", "")
     results = [p for p in posts_db if q.lower() in p.get("text", "").lower()]
     return render_template("home.html", user=session.get("user"), posts=results, stories=[])
@@ -217,15 +217,15 @@ def search():
 
 @app.route("/gallery")
 def gallery():
-    """ギャラリー画面."""
+    """Gallery page."""
     return render_template(
         "home.html", user=session.get("user"), posts=posts_db, stories=stories_db
     )
 
 
 def run_server(host: str = "127.0.0.1", port: int = 5000, debug: bool = True) -> None:
-    """テストサーバーを起動."""
-    print(f"テストサーバーを起動: http://{host}:{port}")
+    """Start the test server."""
+    print(f"Starting test server: http://{host}:{port}")
     app.run(host=host, port=port, debug=debug)
 
 

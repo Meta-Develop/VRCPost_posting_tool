@@ -1,7 +1,7 @@
-"""アプリケーション設定管理.
+"""Application settings management.
 
-Pydantic Settingsを使って型安全に設定を管理する。
-設定はJSON形式で永続化される。
+Uses Pydantic Settings for type-safe configuration.
+Settings are persisted in JSON format.
 """
 
 from __future__ import annotations
@@ -13,52 +13,52 @@ from typing import Optional
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 
-# デフォルトの設定ディレクトリ
+# Default config directory
 CONFIG_DIR = Path(__file__).parent.parent.parent / "config"
 SETTINGS_FILE = CONFIG_DIR / "settings.json"
 
 
 class BrowserSettings(BaseModel):
-    """ブラウザ関連の設定."""
+    """Browser-related settings."""
 
-    headless: bool = Field(default=False, description="ヘッドレスモードで実行するか")
-    timeout_ms: int = Field(default=30000, description="ページ読み込みタイムアウト(ms)")
+    headless: bool = Field(default=False, description="Run in headless mode")
+    timeout_ms: int = Field(default=30000, description="Page load timeout (ms)")
     user_data_dir: str = Field(
-        default="config/browser_data", description="ブラウザのユーザーデータ保存先"
+        default="config/browser_data", description="Browser user data directory"
     )
-    slow_mo: int = Field(default=100, description="操作間のスローモーション(ms)")
+    slow_mo: int = Field(default=100, description="Slow motion between operations (ms)")
 
 
 class SchedulerSettings(BaseModel):
-    """スケジューラー関連の設定."""
+    """Scheduler-related settings."""
 
-    timezone: str = Field(default="Asia/Tokyo", description="タイムゾーン")
-    max_retries: int = Field(default=3, description="失敗時の最大リトライ回数")
-    retry_interval_sec: int = Field(default=60, description="リトライ間隔(秒)")
+    timezone: str = Field(default="Asia/Tokyo", description="Timezone")
+    max_retries: int = Field(default=3, description="Max retries on failure")
+    retry_interval_sec: int = Field(default=60, description="Retry interval (seconds)")
     jobs_file: str = Field(
-        default="config/scheduled_jobs.json", description="スケジュールジョブの保存先"
+        default="config/scheduled_jobs.json", description="Scheduled jobs file path"
     )
 
 
 class PostSettings(BaseModel):
-    """投稿関連の設定."""
+    """Post-related settings."""
 
     default_hashtags: list[str] = Field(
-        default_factory=list, description="デフォルトのハッシュタグ"
+        default_factory=list, description="Default hashtags"
     )
-    max_images: int = Field(default=4, description="一投稿あたりの最大画像数")
-    image_max_size_kb: int = Field(default=5120, description="画像の最大サイズ(KB)")
-    image_max_width: int = Field(default=1920, description="画像の最大幅(px)")
-    image_max_height: int = Field(default=1920, description="画像の最大高さ(px)")
+    max_images: int = Field(default=4, description="Max images per post")
+    image_max_size_kb: int = Field(default=5120, description="Max image size (KB)")
+    image_max_width: int = Field(default=1920, description="Max image width (px)")
+    image_max_height: int = Field(default=1920, description="Max image height (px)")
 
 
 class AppSettings(BaseSettings):
-    """アプリケーション全体の設定."""
+    """Application-wide settings."""
 
-    base_url: str = Field(default="https://vrcpost.com", description="VRCPostのベースURL")
-    test_mode: bool = Field(default=True, description="テストモード（テストサーバー使用）")
+    base_url: str = Field(default="https://vrcpost.com", description="VRCPost base URL")
+    test_mode: bool = Field(default=True, description="Test mode (use test server)")
     test_server_url: str = Field(
-        default="http://localhost:5000", description="テストサーバーのURL"
+        default="http://localhost:5000", description="Test server URL"
     )
     browser: BrowserSettings = Field(default_factory=BrowserSettings)
     scheduler: SchedulerSettings = Field(default_factory=SchedulerSettings)
@@ -66,11 +66,11 @@ class AppSettings(BaseSettings):
 
     @property
     def active_url(self) -> str:
-        """現在アクティブなURL（テストモードならテストサーバー）."""
+        """Active URL (test server in test mode)."""
         return self.test_server_url if self.test_mode else self.base_url
 
     def save(self, path: Optional[Path] = None) -> None:
-        """設定をJSONファイルに保存."""
+        """Save settings to a JSON file."""
         save_path = path or SETTINGS_FILE
         save_path.parent.mkdir(parents=True, exist_ok=True)
         with open(save_path, "w", encoding="utf-8") as f:
@@ -78,7 +78,7 @@ class AppSettings(BaseSettings):
 
     @classmethod
     def load(cls, path: Optional[Path] = None) -> "AppSettings":
-        """JSONファイルから設定を読み込み."""
+        """Load settings from a JSON file."""
         load_path = path or SETTINGS_FILE
         if load_path.exists():
             with open(load_path, "r", encoding="utf-8") as f:
