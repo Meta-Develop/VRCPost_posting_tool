@@ -1,7 +1,7 @@
-"""画像使用履歴の管理.
+"""Image usage history management.
 
-指定ディレクトリ内の画像から未使用のものをランダムに選択し、
-使用済み画像を追跡する。
+Randomly select unused images from a directory and
+track which images have been used.
 """
 
 from __future__ import annotations
@@ -13,18 +13,18 @@ from typing import Optional
 
 from loguru import logger
 
-# 対応拡張子
+# Supported extensions
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
 
-# デフォルトの履歴保存先
+# Default history file
 DEFAULT_HISTORY_FILE = Path("config/image_history.json")
 
 
 class ImageHistory:
-    """画像使用履歴マネージャ.
+    """Image usage history manager.
 
-    JSON ファイルでディレクトリごとの使用済みパスを永続化し、
-    未使用画像のみをランダムに返す。
+    Persists per-directory used image paths in a JSON file
+    and returns only unused images at random.
     """
 
     def __init__(self, history_file: Optional[Path] = None) -> None:
@@ -32,21 +32,21 @@ class ImageHistory:
         self._used: dict[str, list[str]] = {}  # dir_key -> [filename, ...]
         self._load()
 
-    # ── パブリック API ────────────────────────────────
+    # ── Public API ─────────────────────────────────
 
     def pick_unused(self, directory: Path, count: int = 1) -> list[Path]:
-        """ディレクトリから未使用画像をランダムに *count* 枚返す.
+        """Return *count* random unused images from the directory.
 
         Args:
-            directory: 画像ディレクトリ
-            count: 取得枚数
+            directory: Image directory.
+            count: Number of images to pick.
 
         Returns:
-            選ばれた画像パスのリスト（足りなければ少なく返る）
+            List of chosen image paths (may be shorter if insufficient).
         """
         unused = self._get_unused(directory)
         if not unused:
-            logger.warning(f"未使用画像なし: {directory}")
+            logger.warning(f"No unused images: {directory}")
             return []
 
         chosen = random.sample(unused, min(count, len(unused)))
@@ -57,16 +57,16 @@ class ImageHistory:
         self._save()
 
         logger.info(
-            f"画像選択: {[p.name for p in chosen]}  "
-            f"(残り {len(unused) - len(chosen)} 枚)"
+            f"Images selected: {[p.name for p in chosen]}  "
+            f"({len(unused) - len(chosen)} remaining)"
         )
         return chosen
 
     def get_stats(self, directory: Path) -> tuple[int, int, int]:
-        """統計情報を返す.
+        """Return usage statistics.
 
         Returns:
-            (全画像数, 使用済み数, 未使用数)
+            (total, used, unused)
         """
         all_images = self._scan(directory)
         used = self._used_set(directory)
@@ -74,20 +74,20 @@ class ImageHistory:
         return len(all_images), used_count, len(all_images) - used_count
 
     def reset(self, directory: Path) -> None:
-        """指定ディレクトリの使用履歴をリセットする."""
+        """Reset usage history for a directory."""
         dir_key = self._dir_key(directory)
         self._used.pop(dir_key, None)
         self._save()
-        logger.info(f"使用履歴リセット: {directory}")
+        logger.info(f"Usage history reset: {directory}")
 
     def reset_all(self) -> None:
-        """すべてのディレクトリの使用履歴をリセット."""
+        """Reset usage history for all directories."""
         self._used.clear()
         self._save()
-        logger.info("全使用履歴リセット")
+        logger.info("All usage history reset")
 
     def mark_used(self, directory: Path, filename: str) -> None:
-        """手動で画像を使用済みにする."""
+        """Manually mark an image as used."""
         dir_key = self._dir_key(directory)
         self._used.setdefault(dir_key, [])
         if filename not in self._used[dir_key]:
@@ -95,20 +95,20 @@ class ImageHistory:
             self._save()
 
     def is_used(self, directory: Path, filename: str) -> bool:
-        """画像が使用済みか判定."""
+        """Check if an image has been used."""
         return filename in self._used_set(directory)
 
-    # ── 内部メソッド ──────────────────────────────────
+    # ── Internal ───────────────────────────────────
 
     def _get_unused(self, directory: Path) -> list[Path]:
-        """未使用画像のリストを取得."""
+        """Get unused images."""
         all_images = self._scan(directory)
         used = self._used_set(directory)
         return [p for p in all_images if p.name not in used]
 
     @staticmethod
     def _scan(directory: Path) -> list[Path]:
-        """ディレクトリ内の画像ファイルを列挙."""
+        """List image files in a directory."""
         if not directory.is_dir():
             return []
         return sorted(
@@ -122,10 +122,10 @@ class ImageHistory:
 
     @staticmethod
     def _dir_key(directory: Path) -> str:
-        """ディレクトリの正規化キー."""
+        """Normalized directory key."""
         return str(directory.resolve())
 
-    # ── 永続化 ────────────────────────────────────────
+    # ── Persistence ────────────────────────────────
 
     def _load(self) -> None:
         if self._file.exists():
@@ -133,7 +133,7 @@ class ImageHistory:
                 with open(self._file, encoding="utf-8") as f:
                     self._used = json.load(f)
             except (json.JSONDecodeError, OSError) as e:
-                logger.warning(f"履歴ファイル読み込み失敗: {e}")
+                logger.warning(f"Failed to load history file: {e}")
                 self._used = {}
 
     def _save(self) -> None:

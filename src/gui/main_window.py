@@ -1,7 +1,6 @@
-"""メインウィンドウ (CustomTkinter).
+"""Main window (CustomTkinter).
 
-サイドバーナビゲーション + コンテンツ切替の
-モダンなシングルウィンドウ UI。
+Modern single-window UI with sidebar navigation and content switching.
 """
 
 from __future__ import annotations
@@ -13,7 +12,7 @@ from src.config.settings import AppSettings
 from src.gui.events import EventEmitter
 from src.utils.logger import setup_logger
 
-# ── 外観 ──
+# ── Appearance ──
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
@@ -23,7 +22,7 @@ ACCENT_HOVER = "#818cf8"
 
 
 class App(ctk.CTk):
-    """アプリケーションメインウィンドウ."""
+    """Application main window."""
 
     def __init__(self) -> None:
         super().__init__()
@@ -31,54 +30,54 @@ class App(ctk.CTk):
         self.geometry("1120x720")
         self.minsize(900, 560)
 
-        # ── 共有オブジェクト ──
+        # ── Shared objects ──
         self.settings = AppSettings.load()
         self.emitter = EventEmitter()
 
-        # ブラウザブリッジ (遅延起動)
+        # Browser bridge (lazy start)
         from src.browser.bridge import BrowserBridge
 
         self.bridge = BrowserBridge(self.settings, self.emitter)
 
-        # スケジューラー
+        # Scheduler
         from src.scheduler.connector import SchedulerConnector
         from src.scheduler.engine import SchedulerEngine
 
         self._engine = SchedulerEngine(self.settings)
         self.connector = SchedulerConnector(self._engine, self.bridge, self.emitter)
 
-        # 通知
+        # Notifications
         from src.utils.notifier import NotificationManager
 
         self.notifier = NotificationManager(self.emitter)
 
-        # ── UI 構築 ──
+        # ── Build UI ──
         self._build_sidebar()
         self._build_content()
         self._build_statusbar()
 
-        # ── タブ生成 ──
+        # ── Create tabs ──
         self._tabs: dict[str, ctk.CTkFrame] = {}
         self._create_tabs()
         self._show_tab("post")
 
-        # ── イベント接続 ──
+        # ── Connect events ──
         self._connect_events()
 
-        # ── 起動 ──
+        # ── Launch ──
         self.bridge.start()
         self.connector.start()
         self._poll_events()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
-    # ── サイドバー ────────────────────────────────────
+    # ── Sidebar ──────────────────────────────────────
 
     def _build_sidebar(self) -> None:
         self.sidebar = ctk.CTkFrame(self, width=SIDEBAR_W, corner_radius=0)
         self.sidebar.pack(side="left", fill="y")
         self.sidebar.pack_propagate(False)
 
-        # タイトル
+        # Title
         ctk.CTkLabel(
             self.sidebar,
             text="VRCPost",
@@ -91,16 +90,16 @@ class App(ctk.CTk):
             text_color="gray",
         ).pack(pady=(0, 20))
 
-        # ナビボタン
+        # Nav buttons
         self._nav_buttons: dict[str, ctk.CTkButton] = {}
         nav_items = [
-            ("post", "投稿"),
-            ("story", "ストーリー"),
-            ("random", "ランダム投稿"),
-            ("calendar", "カレンダー"),
-            ("schedule", "スケジュール"),
-            ("settings", "設定"),
-            ("log", "ログ"),
+            ("post", "Post"),
+            ("story", "Story"),
+            ("random", "Random Post"),
+            ("calendar", "Calendar"),
+            ("schedule", "Schedule"),
+            ("settings", "Settings"),
+            ("log", "Logs"),
         ]
         for key, label in nav_items:
             btn = ctk.CTkButton(
@@ -117,13 +116,13 @@ class App(ctk.CTk):
             btn.pack(fill="x", padx=12, pady=2)
             self._nav_buttons[key] = btn
 
-        # スペーサー
+        # Spacer
         ctk.CTkFrame(self.sidebar, fg_color="transparent").pack(expand=True)
 
-        # ログインボタン
+        # Login button
         self._login_btn = ctk.CTkButton(
             self.sidebar,
-            text="ログイン",
+            text="Login",
             fg_color=ACCENT,
             hover_color=ACCENT_HOVER,
             height=36,
@@ -132,8 +131,8 @@ class App(ctk.CTk):
         )
         self._login_btn.pack(fill="x", padx=12, pady=(4, 4))
 
-        # モード表示
-        mode_text = "テストモード" if self.settings.test_mode else "本番モード"
+        # Mode display
+        mode_text = "Test Mode" if self.settings.test_mode else "Production"
         self._mode_label = ctk.CTkLabel(
             self.sidebar,
             text=mode_text,
@@ -142,18 +141,18 @@ class App(ctk.CTk):
         )
         self._mode_label.pack(pady=(0, 16))
 
-    # ── コンテンツエリア ──────────────────────────────
+    # ── Content area ─────────────────────────────────
 
     def _build_content(self) -> None:
         self.content = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
         self.content.pack(side="left", fill="both", expand=True)
 
-    # ── ステータスバー ────────────────────────────────
+    # ── Status bar ───────────────────────────────────
 
     def _build_statusbar(self) -> None:
         self._statusbar = ctk.CTkLabel(
             self,
-            text="起動中...",
+            text="Starting...",
             font=ctk.CTkFont(size=11),
             text_color="gray",
             anchor="w",
@@ -161,7 +160,7 @@ class App(ctk.CTk):
         )
         self._statusbar.pack(side="bottom", fill="x", padx=8)
 
-    # ── タブ管理 ──────────────────────────────────────
+    # ── Tab management ───────────────────────────────
 
     def _create_tabs(self) -> None:
         from src.gui.calendar_tab import CalendarTab
@@ -185,19 +184,19 @@ class App(ctk.CTk):
             tab.pack_forget()
         self._tabs[name].pack(fill="both", expand=True, padx=16, pady=16)
 
-        # ナビハイライト
+        # Nav highlight
         for key, btn in self._nav_buttons.items():
             if key == name:
                 btn.configure(fg_color=ACCENT, text_color="white")
             else:
                 btn.configure(fg_color="transparent", text_color="gray90")
 
-        # タブ固有のリフレッシュ
+        # Tab-specific refresh
         tab = self._tabs[name]
         if hasattr(tab, "on_show"):
             tab.on_show()
 
-    # ── イベント ──────────────────────────────────────
+    # ── Events ───────────────────────────────────────
 
     def _connect_events(self) -> None:
         self.emitter.on("status_changed", self._set_status)
@@ -214,14 +213,14 @@ class App(ctk.CTk):
 
     def _set_login_state(self, ok: bool) -> None:
         if ok:
-            self._login_btn.configure(text="ログイン済み", fg_color="green")
+            self._login_btn.configure(text="Logged In", fg_color="green")
         else:
-            self._login_btn.configure(text="ログイン", fg_color=ACCENT)
+            self._login_btn.configure(text="Login", fg_color=ACCENT)
 
     def _on_login(self) -> None:
         self.bridge.login()
 
-    # ── トースト通知 ──────────────────────────────────
+    # ── Toast notifications ──────────────────────────
 
     def _show_toast(self, title: str, message: str, level: str = "info") -> None:
         colors = {"info": "#3b82f6", "warning": "#f59e0b", "error": "#ef4444"}
@@ -239,13 +238,13 @@ class App(ctk.CTk):
             justify="left",
         ).pack(padx=16, pady=10)
 
-        # 4秒後にフェードアウト
+        # Fade out after 4 seconds
         self.after(4000, toast.destroy)
 
-    # ── 終了処理 ──────────────────────────────────────
+    # ── Shutdown ─────────────────────────────────────
 
     def _on_close(self) -> None:
-        logger.info("アプリケーション終了")
+        logger.info("Application closing")
         self.settings.save()
         self.connector.stop()
         self.bridge.shutdown()
@@ -253,7 +252,7 @@ class App(ctk.CTk):
 
 
 def main() -> None:
-    """アプリケーションエントリーポイント."""
+    """Application entry point."""
     setup_logger()
     app = App()
     app.mainloop()

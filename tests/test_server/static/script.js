@@ -1,7 +1,7 @@
-// VRCPost テストサーバー用スクリプト
+// VRCPost test server script
 
 /**
- * 投稿フォームの画像プレビュー
+ * Preview images in the post form
  */
 function previewImages(input) {
     const container = document.getElementById('image-preview-container');
@@ -21,13 +21,13 @@ function previewImages(input) {
 }
 
 /**
- * 予約投稿の日時入力を表示/非表示
+ * Toggle scheduled post datetime input
  */
 function toggleSchedule() {
     const input = document.getElementById('schedule-input');
     if (input.style.display === 'none') {
         input.style.display = 'block';
-        // 現在時刻 + 1時間をデフォルトに
+        // Default to current time + 1 hour
         const now = new Date();
         now.setHours(now.getHours() + 1);
         now.setMinutes(0);
@@ -39,7 +39,7 @@ function toggleSchedule() {
 }
 
 /**
- * Ctrl+Enter で投稿
+ * Submit post with Ctrl+Enter
  */
 document.addEventListener('keydown', function(e) {
     if (e.ctrlKey && e.key === 'Enter') {

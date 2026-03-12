@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ログイン - VRCPost (テストサーバー)</title>
+    <title>Login - VRCPost (Test Server)</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -18,20 +18,20 @@
 
     <main class="login-page">
         <div class="login-card">
-            <h2>VRCPostにログイン</h2>
-            <p>テストサーバー — どのメールアドレスでもログインできます</p>
+            <h2>Login to VRCPost</h2>
+            <p>Test server &mdash; any email address can log in</p>
 
             <a href="/login/google" class="btn btn-google btn-full">
                 Continue with Google
             </a>
 
             <div class="divider">
-                <span>または</span>
+                <span>or</span>
             </div>
 
             <form action="/login" method="POST">
                 <div class="form-group">
-                    <label for="email">メールアドレス</label>
+                    <label for="email">Email</label>
                     <input type="email" id="email" name="email" placeholder="you@example.com" required>
                 </div>
                 <button type="submit" class="btn btn-primary btn-full">

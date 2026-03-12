@@ -1,101 +1,101 @@
 # VRCPost Posting Tool
 
-VRCPost への予約投稿・ストーリー自動更新を行うデスクトップアプリケーションです。
+A desktop application for scheduled posting and automatic story updates on VRCPost.
 
-## 機能
+## Features
 
-- **予約投稿**: 指定した日時に写真付きポストを自動投稿
-- **ストーリー更新**: 指定した時間にストーリーを自動更新
-- **スケジュール管理**: 繰り返し投稿（日次・週次・月次）や一括スケジュール設定
-- **画像管理**: 投稿する画像のプレビュー・ドラッグ＆ドロップ対応
-- **設定管理**: 接続先 URL やブラウザオプション等を GUI から変更可能
-- **ログビューア**: アプリ内でリアルタイムにログを確認・フィルタ・エクスポート
+- **Scheduled Posting**: Automatically post photos with text at a specified date and time
+- **Story Updates**: Automatically update stories at a specified time
+- **Schedule Management**: Recurring posts (daily/weekly/monthly) and batch scheduling
+- **Image Management**: Image preview and drag-and-drop support
+- **Settings Management**: Configure target URL, browser options, and more from the GUI
+- **Log Viewer**: View, filter, and export logs in real time within the app
 
-## 必要要件
+## Requirements
 
-- Python 3.10 以上
-- Google Chrome または Chromium ベースブラウザ
+- Python 3.10 or later
+- Google Chrome or a Chromium-based browser
 
-## インストール
+## Installation
 
 ```bash
-# リポジトリをクローン
+# Clone the repository
 git clone https://github.com/Meta-Develop/VRCPost_posting_tool.git
 cd VRCPost_posting_tool
 
-# 仮想環境を作成
+# Create a virtual environment
 python -m venv .venv
 .venv\Scripts\activate  # Windows
 # source .venv/bin/activate  # macOS/Linux
 
-# 依存パッケージをインストール
+# Install dependencies
 pip install -e .
 
-# Playwright ブラウザをインストール
+# Install Playwright browser
 playwright install chromium
 ```
 
-## 使い方
+## Usage
 
 ```bash
-# GUI を起動
+# Launch the GUI
 vrcpost-poster
 
-# または直接実行
+# Or run directly
 python -m src
 ```
 
-### 初回セットアップ
+### Initial Setup
 
-1. アプリを起動すると、VRCPost のログイン画面が表示されます
-2. Google アカウントまたはメールアドレスでログインしてください
-3. ログイン後、セッション情報が安全に保存されます
+1. When you launch the app, the VRCPost login screen will appear
+2. Log in with your Google account or email address
+3. After logging in, session information is saved securely
 
-### 予約投稿
+### Scheduled Posting
 
-1. 「投稿」タブを開く
-2. 画像を選択（ドラッグ＆ドロップ対応）
-3. テキストを入力
-4. 「予約投稿」にチェックを入れ、投稿日時を設定
-5. 「投稿する」ボタンをクリック
+1. Open the "Post" tab
+2. Select an image (drag-and-drop supported)
+3. Enter text
+4. Check "Schedule Post" and set the date and time
+5. Click the "Post" button
 
-### ストーリー更新
+### Story Updates
 
-1. 「ストーリー」タブを開く
-2. ストーリー用の画像を選択
-3. テキストを入力（任意）
-4. 「予約更新」にチェックを入れ、更新時間を設定
-5. 「アップロード」をクリック
+1. Open the "Story" tab
+2. Select an image for the story
+3. Enter text (optional)
+4. Check "Schedule Update" and set the time
+5. Click "Upload"
 
-### スケジュール管理
+### Schedule Management
 
-「スケジュール」タブで登録済みジョブの一覧を確認できます。
-ジョブの選択・キャンセルも同タブから操作できます。
+You can view all registered jobs in the "Schedule" tab.
+Job selection and cancellation are also available from this tab.
 
-### 設定
+### Settings
 
-「設定」タブから接続先 URL、ブラウザオプション、投稿デフォルト、
-スケジューラ同時実行数などを変更できます。
-設定は `config/settings.json` に保存されます。
+From the "Settings" tab, you can change the target URL, browser options,
+post defaults, scheduler concurrency, and more.
+Settings are saved to `config/settings.json`.
 
-### ログ
+### Logs
 
-「ログ」タブでアプリケーションのログをリアルタイムに確認できます。
-ログレベルでフィルタしたり、テキストファイルへエクスポートできます。
+The "Log" tab lets you view application logs in real time.
+You can filter by log level or export logs to a text file.
 
-## 開発
+## Development
 
 ```bash
-# 開発用依存をインストール
+# Install development dependencies
 pip install -e ".[dev]"
 
-# テスト実行
+# Run tests
 python -m pytest tests/ -v
 
 # Lint
 python -m ruff check src/ tests/
 ```
 
-## ライセンス
+## License
 
 MIT License

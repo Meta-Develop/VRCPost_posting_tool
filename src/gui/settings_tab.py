@@ -1,6 +1,6 @@
-"""設定タブ (CustomTkinter).
+"""Settings tab (CustomTkinter).
 
-アプリケーション設定の表示・編集を提供する。
+Provides viewing and editing of application settings.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 
 class SettingsTab(ctk.CTkFrame):
-    """設定タブ."""
+    """Settings tab."""
 
     def __init__(self, parent: ctk.CTkFrame, app: App) -> None:
         super().__init__(parent, fg_color="transparent")
@@ -24,48 +24,48 @@ class SettingsTab(ctk.CTkFrame):
         self._build_ui()
         self._load_values()
 
-    # ── UI 構築 ──
+    # ── Build UI ──
 
     def _build_ui(self) -> None:
         ctk.CTkLabel(
-            self, text="設定", font=ctk.CTkFont(size=22, weight="bold")
+            self, text="Settings", font=ctk.CTkFont(size=22, weight="bold")
         ).pack(anchor="w", pady=(0, 12))
 
         scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
         scroll.pack(fill="both", expand=True)
 
-        # ── 接続 ──
-        self._section(scroll, "接続設定")
-        self._add_entry(scroll, "base_url", "本番 URL")
-        self._add_entry(scroll, "test_server_url", "テストサーバー URL")
-        self._add_switch(scroll, "test_mode", "テストモード")
+        # ── Connection ──
+        self._section(scroll, "Connection")
+        self._add_entry(scroll, "base_url", "Production URL")
+        self._add_entry(scroll, "test_server_url", "Test Server URL")
+        self._add_switch(scroll, "test_mode", "Test Mode")
 
-        # ── ブラウザ ──
-        self._section(scroll, "ブラウザ設定")
-        self._add_switch(scroll, "headless", "ヘッドレスモード")
-        self._add_entry(scroll, "timeout_ms", "タイムアウト (ms)")
-        self._add_entry(scroll, "slow_mo", "スローモーション (ms)")
+        # ── Browser ──
+        self._section(scroll, "Browser")
+        self._add_switch(scroll, "headless", "Headless Mode")
+        self._add_entry(scroll, "timeout_ms", "Timeout (ms)")
+        self._add_entry(scroll, "slow_mo", "Slow Motion (ms)")
 
-        # ── 投稿 ──
-        self._section(scroll, "投稿設定")
-        self._add_entry(scroll, "max_images", "最大画像数")
-        self._add_entry(scroll, "image_max_size_kb", "画像最大サイズ (KB)")
-        self._add_entry(scroll, "image_max_width", "画像最大幅 (px)")
-        self._add_entry(scroll, "image_max_height", "画像最大高さ (px)")
-        self._add_entry(scroll, "default_hashtags", "デフォルトハッシュタグ")
+        # ── Post ──
+        self._section(scroll, "Post")
+        self._add_entry(scroll, "max_images", "Max Images")
+        self._add_entry(scroll, "image_max_size_kb", "Max Image Size (KB)")
+        self._add_entry(scroll, "image_max_width", "Max Image Width (px)")
+        self._add_entry(scroll, "image_max_height", "Max Image Height (px)")
+        self._add_entry(scroll, "default_hashtags", "Default Hashtags")
 
-        # ── スケジューラー ──
-        self._section(scroll, "スケジューラー設定")
-        self._add_entry(scroll, "timezone", "タイムゾーン")
-        self._add_entry(scroll, "max_retries", "最大リトライ")
-        self._add_entry(scroll, "retry_interval_sec", "リトライ間隔 (秒)")
+        # ── Scheduler ──
+        self._section(scroll, "Scheduler")
+        self._add_entry(scroll, "timezone", "Timezone")
+        self._add_entry(scroll, "max_retries", "Max Retries")
+        self._add_entry(scroll, "retry_interval_sec", "Retry Interval (sec)")
 
-        # ボタン
+        # Buttons
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
         btn_frame.pack(fill="x", pady=(12, 0))
         ctk.CTkButton(
             btn_frame,
-            text="保存",
+            text="Save",
             height=36,
             corner_radius=8,
             fg_color="#6366f1",
@@ -75,14 +75,14 @@ class SettingsTab(ctk.CTkFrame):
         ).pack(side="left", expand=True, fill="x", padx=(0, 4))
         ctk.CTkButton(
             btn_frame,
-            text="リセット",
+            text="Reset",
             height=36,
             corner_radius=8,
             fg_color="gray40",
             command=self._reset,
         ).pack(side="left", width=100)
 
-    # ── ヘルパー ──
+    # ── Helpers ──
 
     def _section(self, parent: ctk.CTkFrame, title: str) -> None:
         ctk.CTkLabel(
@@ -110,7 +110,7 @@ class SettingsTab(ctk.CTkFrame):
         self._vars[key] = var
         self._entries[key] = sw
 
-    # ── 値の読み書き ──
+    # ── Load / Save ──
 
     def _load_values(self) -> None:
         s = self.app.settings
@@ -190,13 +190,13 @@ class SettingsTab(ctk.CTkFrame):
             pass
 
         s.save()
-        self.app.notifier.info("設定", "設定を保存しました")
+        self.app.notifier.info("Settings", "Settings saved")
 
-        # モードラベル更新
-        mode_text = "テストモード" if s.test_mode else "本番モード"
+        # Update mode label
+        mode_text = "Test Mode" if s.test_mode else "Production"
         color = "orange" if s.test_mode else "green"
         self.app._mode_label.configure(text=mode_text, text_color=color)
 
     def _reset(self) -> None:
         self._load_values()
-        self.app.notifier.info("設定", "変更を元に戻しました")
+        self.app.notifier.info("Settings", "Changes reverted")
