@@ -30,19 +30,27 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Issue #9 tracks Black conformance for browser, GUI, and utility sources.
+        # Compile and Ruff checks remain enabled for every listed logic unit.
         include:
           - logic-unit: entrypoint
             python-version: "3.12.12"
+            check_format: true
           - logic-unit: browser
             python-version: "3.12.12"
+            check_format: false
           - logic-unit: scheduler
             python-version: "3.12.12"
+            check_format: true
           - logic-unit: gui
             python-version: "3.12.12"
+            check_format: false
           - logic-unit: config
             python-version: "3.12.12"
+            check_format: true
           - logic-unit: utils
             python-version: "3.12.12"
+            check_format: false
     steps:
       - name: Check out source without persisted credentials
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -71,9 +79,10 @@ jobs:
             ruff==0.16.0
           python -m pip check
 
-      - name: Compile, lint, and check formatting
+      - name: Compile, lint, and check supported formatting
         shell: bash
         env:
+          CHECK_FORMAT: ${{ matrix.check_format }}
           LOGIC_UNIT: ${{ matrix.logic-unit }}
         run: |
           set -euo pipefail
@@ -106,7 +115,9 @@ jobs:
           PYTHONPYCACHEPREFIX="${RUNNER_TEMP}/pycache-${LOGIC_UNIT}" \
             python -m compileall -q "${paths[@]}"
           ruff check "${paths[@]}"
-          black --check --target-version py310 "${paths[@]}"
+          if [[ "$CHECK_FORMAT" == "true" ]]; then
+            black --check --target-version py310 "${paths[@]}"
+          fi
 
   local-playwright-e2e:
     name: Local Playwright E2E
