@@ -69,7 +69,18 @@ jobs:
               core.notice("Ignoring a non-default-branch workflow run.");
               return;
             }
-            if (!["failure", "success"].includes(run.conclusion)) {
+            const failureLikeConclusions = new Set([
+              "failure",
+              "timed_out",
+              "cancelled",
+              "action_required",
+              "startup_failure",
+              "stale",
+            ]);
+            if (
+              run.conclusion !== "success" &&
+              !failureLikeConclusions.has(run.conclusion)
+            ) {
               core.notice(`Ignoring non-lifecycle conclusion: ${run.conclusion}`);
               return;
             }
@@ -231,14 +242,6 @@ jobs:
               }
             }
 
-            const failureLikeConclusions = new Set([
-              "failure",
-              "timed_out",
-              "cancelled",
-              "action_required",
-              "startup_failure",
-              "stale",
-            ]);
             const failingJobs = jobs
               .filter((job) => failureLikeConclusions.has(job.conclusion))
               .map((job) => ({
